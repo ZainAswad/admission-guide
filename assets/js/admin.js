@@ -27,13 +27,15 @@ function imgFallback(el){
       const alt = cdnUrl(el.dataset.orig);
       if(alt){ el.dataset.tried = '1'; el.src = alt; return; }
     }
-    el.insertAdjacentHTML('afterend', art(el.dataset.fb || 'junction'));
+    const fb = el.dataset.fb;
+    if(fb) el.insertAdjacentHTML('afterend', art(fb));
     el.remove();
   }catch(e){}
 }
 
 const DKEY = 'wz_draft_v1', TKEY = 'wz_gh_token', PKEY = 'wz_published_v1';
 const IMG_DIR = 'assets/img/products/';
+const BRAND_DIR = 'assets/img/brands/';
 const DATA_PATH = 'assets/js/data.js';
 
 /* الحالة */
@@ -48,6 +50,7 @@ function markDirty(v = true){ dirty = v; document.body.classList.toggle('dirty',
 function coreOf(d){
   const c = clone(d);
   (c.PRODUCTS || []).forEach(p => { delete p.imgData; delete p.imgNew; });
+  (c.BRANDS || []).forEach(b => { delete b.logoData; delete b.logoNew; });
   return bodyOf(serializeData(c));
 }
 function bodyOf(text){ const i = text.indexOf('let SITE'); return (i > -1 ? text.slice(i) : text).trim(); }
@@ -214,7 +217,7 @@ function serializeData(d){
   L.push('');
   L.push('/* ---------- 3) العلامات التجارية ---------- */');
   L.push('let BRANDS = [');
-  L.push(d.BRANDS.map(b => `  { name: ${q(b.name)}, ar: ${q(b.ar || '')} }`).join(',\n'));
+  L.push(d.BRANDS.map(b => `  { name: ${q(b.name)}, ar: ${q(b.ar || '')}${b.logo ? `, logo: ${q(b.logo)}` : ''} }`).join(',\n'));
   L.push('];');
   L.push('');
   L.push('/* ---------- 4) المنتجات ---------- */');
@@ -239,12 +242,14 @@ function serializeData(d){
 function exportData(){
   const d = clone(D);
   d.PRODUCTS.forEach(p => { delete p.imgData; delete p.imgNew; });
+  d.BRANDS.forEach(b => { delete b.logoData; delete b.logoNew; });
   return serializeData(d);
 }
 
 /* ============ تبويب المنتجات ============ */
 let pf = { q:'', cat:'', brand:'', sort:'new' };
 let sel = new Set();
+let selB = new Set();
 
 function subName(key){
   const [c, s] = String(key).split('/');
@@ -475,7 +480,7 @@ function productSheet(id){
 }
 
 /* تصغير الصورة داخل المتصفح */
-function resizeImage(file, max, quality){
+function resizeImage(file, max, quality, mime){
   return new Promise((res, rej) => {
     const fr = new FileReader();
     fr.onerror = rej;
@@ -489,9 +494,10 @@ function resizeImage(file, max, quality){
         const cv = document.createElement('canvas');
         cv.width = w; cv.height = h;
         const cx = cv.getContext('2d');
-        cx.fillStyle = '#fff'; cx.fillRect(0, 0, w, h);
+        const type = mime || 'image/jpeg';
+        if(type !== 'image/png'){ cx.fillStyle = '#fff'; cx.fillRect(0, 0, w, h); }  // PNG يحتفظ بالشفافية
         cx.drawImage(im, 0, 0, w, h);
-        res(cv.toDataURL('image/jpeg', quality));
+        res(cv.toDataURL(type, quality));
       };
       im.src = fr.result;
     };
@@ -606,7 +612,14 @@ function subSheet(cid, sid){
 
 /* ============ تبويب العلامات التجارية ============ */
 function renderBrands(){
+  renderBulkB();
+  const all = $('#bSelAll');
+  if(all) all.checked = D.BRANDS.length > 0 && selB.size === D.BRANDS.length;
   $('#bList').innerHTML = D.BRANDS.map((b, i) => `<div class="subedit">
+    <input type="checkbox" data-bsel="${i}"${selB.has(i) ? ' checked' : ''} aria-label="تحديد">
+    <span class="blogo-cell">${b.logoData || b.logo
+      ? `<img src="${esc(b.logoData || assetUrl(b.logo))}" alt=""${b.logo ? ` data-orig="${esc(b.logo)}"` : ''} data-fb="" onerror="imgFallback(this)">`
+      : icon('tag')}</span>
     <b style="flex:1;font-size:14px">${esc(b.name)}</b>
     <span style="color:var(--grey);font-size:13px;flex:1">${esc(b.ar || '')}</span>
     <span style="font-size:12px;color:var(--grey-2);font-weight:700">${D.PRODUCTS.filter(p => p.brand === b.name).length} منتج</span>
@@ -614,23 +627,85 @@ function renderBrands(){
     <button class="ibtn del" data-bdel="${i}" style="width:32px;height:32px">${icon('trash')}</button>
   </div>`).join('') || '<p style="color:var(--grey);padding:14px">لا توجد علامات — أضف أول علامة.</p>';
 }
+function renderBulkB(){
+  const bar = $('#bulkBarB'); if(!bar) return;
+  if(!selB.size){ bar.classList.remove('on'); bar.innerHTML = ''; return; }
+  bar.classList.add('on');
+  bar.innerHTML = `<b>حُدِّدت ${selB.size} علامة</b>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-inline-start:auto">
+      <button class="btn btn-sm btn-ghost" id="bNone">إلغاء التحديد</button>
+      <button class="btn btn-sm btn-danger" id="bDel">${icon('trash')}<span>حذف المحدد (${selB.size})</span></button>
+    </div>`;
+  $('#bNone').onclick = () => { selB.clear(); renderBrands(); };
+  $('#bDel').onclick = async () => {
+    const names = [...selB].map(i => D.BRANDS[i] && D.BRANDS[i].name).filter(Boolean);
+    if(await confirmBox('حذف العلامات المحددة',
+      `سيُحذف ${selB.size} علامة من القائمة (${names.slice(0, 4).join('، ')}${names.length > 4 ? ' وغيرها' : ''}). لن تتأثر المواد المرتبطة بها.`,
+      `حذف ${selB.size} علامة`)){
+      D.BRANDS = D.BRANDS.filter((_, i) => !selB.has(i));
+      const n = selB.size; selB.clear();
+      saveDraft(); renderBrands(); renderStats();
+      toast(`حُذفت ${n} علامة`, 'ok');
+    }
+  };
+}
+
 function brandSheet(i){
   const isNew = i === null;
   const b = isNew ? { name:'', ar:'' } : D.BRANDS[i];
+  let logoData = b.logoData || '', logoPath = b.logo || '', logoNew = false;
   openSheet(isNew ? 'إضافة علامة تجارية' : 'تعديل العلامة', `
     <div class="form">
       <div class="f2">
         <div class="field"><input id="bn" placeholder=" " value="${esc(b.name)}" dir="ltr"><label>الاسم بالإنكليزية *</label><span class="msg">مطلوب</span></div>
         <div class="field"><input id="ba" placeholder=" " value="${esc(b.ar || '')}"><label>الاسم بالعربية</label></div>
       </div>
+      <div><h4 style="font-size:14px;margin-bottom:8px">شعار العلامة <small style="color:var(--grey);font-weight:600">— اختياري، يُفضَّل بخلفية شفافة</small></h4>
+        <div class="imgbox">
+          <div class="prev" id="bPrev" style="background:#fff">${logoData || logoPath
+            ? `<img src="${esc(logoData || assetUrl(logoPath))}" alt="" style="object-fit:contain;padding:8px">`
+            : icon('tag')}</div>
+          <div class="meta" id="bMeta">${logoPath ? `الشعار الحالي: <code>${esc(logoPath)}</code>` : 'بدون شعار — يظهر اسم العلامة نصاً.'}</div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap">
+            <label class="btn btn-sm btn-tonal">${icon('box')}<span>اختيار شعار</span>
+              <input type="file" id="bImg" accept="image/*" hidden></label>
+            <button class="btn btn-sm btn-ghost" type="button" id="bImgDel"${logoData || logoPath ? '' : ' style="display:none"'}>${icon('trash')}<span>إزالة</span></button>
+          </div>
+        </div>
+      </div>
     </div>`,
     `<button class="btn btn-ghost" data-x>إلغاء</button><button class="btn" id="bSave">${icon('check')}<span>حفظ</span></button>`);
+
+  $('#bImg').onchange = async e => {
+    const f = e.target.files[0]; if(!f) return;
+    try{
+      logoData = await resizeImage(f, 260, .92, 'image/png');
+      logoNew = true;
+      $('#bPrev').innerHTML = `<img src="${logoData}" alt="" style="object-fit:contain;padding:8px">`;
+      $('#bMeta').innerHTML = `شعار جديد جاهز — <b>${Math.round(logoData.length * 0.75 / 1024)} كيلوبايت</b>. يُرفع عند النشر.`;
+      $('#bImgDel').style.display = '';
+    }catch(err){ toast('تعذّرت قراءة الصورة', 'err'); }
+  };
+  $('#bImgDel').onclick = () => {
+    logoData = ''; logoPath = ''; logoNew = false;
+    $('#bPrev').innerHTML = icon('tag');
+    $('#bMeta').textContent = 'بدون شعار — يظهر اسم العلامة نصاً.';
+    $('#bImgDel').style.display = 'none';
+  };
+
   $('#bSave').onclick = () => {
     const name = $('#bn').value.trim();
     if(!name){ $('#bn').closest('.field').classList.add('err'); return; }
-    if(isNew) D.BRANDS.push({ name, ar:$('#ba').value.trim() });
-    else { const old = b.name; b.name = name; b.ar = $('#ba').value.trim();
+    const ar = $('#ba').value.trim();
+    const rec = isNew ? { name, ar } : b;
+    if(!isNew){ const old = b.name; b.name = name; b.ar = ar;
       D.PRODUCTS.forEach(p => { if(p.brand === old) p.brand = name; }); }
+    if(logoNew){
+      rec.logo = BRAND_DIR + slugFrom(name, []) + '.png';
+      rec.logoData = logoData; rec.logoNew = true;
+    } else if(logoPath){ rec.logo = logoPath; if(logoData) rec.logoData = logoData; }
+    else { delete rec.logo; delete rec.logoData; delete rec.logoNew; }
+    if(isNew) D.BRANDS.push(rec);
     saveDraft(); closeSheet(); renderBrands(); renderStats(); renderProducts();
     toast('حُفظت العلامة', 'ok');
   };
@@ -949,20 +1024,27 @@ async function publishToGitHub(){
   };
 
   try{
-    const imgs = D.PRODUCTS.filter(p => p.imgNew && p.imgData);
+    const jobs = [
+      ...D.PRODUCTS.filter(p => p.imgNew && p.imgData).map(p => ({
+        path: p.image || (IMG_DIR + p.id + '.jpg'), data: p.imgData, name: p.name,
+        msg: `رفع صورة المادة ${p.id}`, done: pth => { p.image = pth; delete p.imgNew; } })),
+      ...D.BRANDS.filter(b => b.logoNew && b.logoData).map(b => ({
+        path: b.logo || (BRAND_DIR + slugFrom(b.name, []) + '.png'), data: b.logoData, name: 'شعار ' + b.name,
+        msg: `رفع شعار ${b.name}`, done: pth => { b.logo = pth; delete b.logoNew; } }))
+    ];
     const uploaded = [];
-    for(const p of imgs){
-      const path = p.image || (IMG_DIR + p.id + '.jpg');
-      await put(path, p.imgData.split(',')[1], `رفع صورة المادة ${p.id}`);
-      say(`رُفعت صورة <b>${esc(p.name)}</b>`);
-      p.image = path; delete p.imgNew;
-      uploaded.push({ path, name:p.name });
+    for(const j of jobs){
+      await put(j.path, j.data.split(',')[1], j.msg);
+      say(`رُفع <b>${esc(j.name)}</b>`);
+      j.done(j.path);
+      uploaded.push({ path:j.path, name:j.name });
     }
     const res = await put(DATA_PATH, b64utf8(exportData()), 'تحديث بيانات المتجر من لوحة التحكم');
     say(`نُشر ملف البيانات بنجاح — <a href="${res.commit.html_url}" target="_blank" rel="noopener"><b>عرض التغيير على GitHub</b></a>`);
     say('سيُحدَّث الموقع تلقائياً خلال ثوانٍ عبر Vercel. حدّث صفحة المتجر للتأكد.');
 
     D.PRODUCTS.forEach(p => { delete p.imgData; delete p.imgNew; });
+    D.BRANDS.forEach(b => { delete b.logoData; delete b.logoNew; });
     const sig = coreOf(D);
     localStorage.setItem(PKEY, sig);
     writeDraft();                 // نُبقي نسخة بياناتك حتى يعرضها الموقع
@@ -1089,6 +1171,12 @@ function bind(){
       return;
     }
 
+    if(t.id === 'bSelAll'){
+      if(t.checked) D.BRANDS.forEach((_, i) => selB.add(i)); else selB.clear();
+      renderBrands(); return;
+    }
+    const bs = t.closest('[data-bsel]');
+    if(bs){ const i = +bs.dataset.bsel; bs.checked ? selB.add(i) : selB.delete(i); renderBulkB(); return; }
     if(t.closest('#addBrand')) return brandSheet(null);
     const be = t.closest('[data-bedit]'); if(be) return brandSheet(+be.dataset.bedit);
     const bd = t.closest('[data-bdel]');
@@ -1232,7 +1320,8 @@ async function runDiagnostics(){
     } else add('ملف المواد', 'فشل (' + r.status + ')', false);
   }catch(e){ add('ملف المواد', 'تعذّر الوصول', false); }
 
-  const withImg = D.PRODUCTS.filter(p => p.image);
+  const withImg = [...D.PRODUCTS.filter(p => p.image).map(p => ({ name:p.name, image:p.image })),
+                   ...D.BRANDS.filter(b => b.logo).map(b => ({ name:'شعار ' + b.name, image:b.logo }))];
   if(!withImg.length) add('صور المنتجات', 'لا توجد مواد بصور بعد', true);
   for(const p of withImg){
     try{

@@ -180,3 +180,10 @@ details summary::-webkit-details-marker{display:none}
 .diagrow .dot{width:9px;height:9px;border-radius:50%;flex:none;margin-top:6px}
 .diagrow .dot.ok{background:#12B76A}
 .diagrow .dot.bad{background:var(--danger)}
+
+.subedit input[type=checkbox]{width:18px;height:18px;accent-color:var(--brand);cursor:pointer;flex:none;margin:0}
+#bSelAll{width:18px;height:18px;accent-color:var(--brand);position:static;opacity:1;pointer-events:auto}
+.blogo-cell{width:52px;height:34px;flex:none;display:grid;place-items:center;background:#fff;
+  border:1px solid var(--line-2);border-radius:var(--r-xs);overflow:hidden;color:var(--grey-2)}
+.blogo-cell img{max-width:100%;max-height:100%;object-fit:contain;padding:3px}
+.blogo-cell .ic{width:18px;height:18px}

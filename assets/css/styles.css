@@ -495,9 +495,10 @@ html[dir=rtl] .sel select{padding:9px 14px 9px 34px}
   display:grid;place-items:center;flex:none;transition:background var(--t) var(--ease),color var(--t) var(--ease)}
 .cbox:hover .pic{background:var(--brand);color:#fff}
 .cbox h4{font-size:14.5px;margin-bottom:4px}
-.cbox p,.cbox a{font-size:13.5px;color:var(--grey);display:block}
-.cbox a:hover{color:var(--brand-700)}
-.cbox .num{font-size:17px;font-weight:900;color:var(--ink);direction:ltr;text-align:start;letter-spacing:.4px}
+.cbox p,.cbox a:not(.btn):not(.soc):not(.num){font-size:13.5px;color:var(--grey);display:block}
+.cbox a:not(.btn):not(.soc):not(.num):hover{color:var(--brand-700)}
+.cbox a.num,.cbox .num{display:block;font-size:17px;font-weight:900;color:var(--ink);direction:ltr;text-align:start;letter-spacing:.4px;transition:color var(--t) var(--ease)}
+.cbox a.num:hover{color:var(--brand-700)}
 .map-card{border-radius:var(--r-lg);overflow:hidden;box-shadow:var(--e2);border:1px solid var(--line-2);background:#fff}
 .map-wrap{position:relative;min-height:400px;background:
   repeating-linear-gradient(45deg,var(--surface-2),var(--surface-2) 14px,#EBF1F2 14px,#EBF1F2 28px)}
@@ -517,9 +518,9 @@ html[dir=rtl] .sel select{padding:9px 14px 9px 34px}
 .footer{background:var(--ink);color:#C7D3D7;margin-top:60px;padding-top:52px}
 .foot-grid{display:grid;grid-template-columns:1.5fr 1fr 1fr 1.2fr;gap:34px;padding-bottom:38px}
 .footer h4{color:#fff;font-size:15px;margin-bottom:15px}
-.footer a{font-size:13.5px;color:#A9B9BE;display:block;padding:4px 0;transition:color var(--t) var(--ease),transform var(--t) var(--ease)}
-.footer a:hover{color:var(--brand);transform:translateX(-4px)}
-html[dir=rtl] .footer a:hover{transform:translateX(-4px)}
+.footer a:not(.soc):not(.btn){font-size:13.5px;color:#A9B9BE;display:block;padding:4px 0;transition:color var(--t) var(--ease),transform var(--t) var(--ease)}
+.footer a:not(.soc):not(.btn):hover{color:var(--brand);transform:translateX(-4px)}
+html[dir=rtl] .footer a:not(.soc):not(.btn):hover{transform:translateX(-4px)}
 .foot-brand{display:flex;align-items:center;gap:13px;margin-bottom:14px}
 .foot-brand img{width:56px;height:56px;border-radius:var(--r-sm)}
 .foot-brand b{color:#fff;font-size:15.5px;display:block;font-weight:900}
@@ -606,3 +607,7 @@ html[dir=rtl] .footer a:hover{transform:translateX(-4px)}
   .modal{padding:0;align-items:flex-end}
   .modal-card{border-radius:var(--r-xl) var(--r-xl) 0 0;max-height:92vh}
 }
+
+/* شعار العلامة التجارية داخل الشريط المتحرك */
+.bchip .blogo{height:34px;width:auto;max-width:110px;object-fit:contain;margin-bottom:4px}
+.bchip:has(.blogo) b{font-size:13px}

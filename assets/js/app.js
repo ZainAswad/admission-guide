@@ -27,7 +27,8 @@ function imgFallback(el){
       const alt = cdnUrl(el.dataset.orig);
       if(alt){ el.dataset.tried = '1'; el.src = alt; return; }
     }
-    el.insertAdjacentHTML('afterend', art(el.dataset.fb || 'junction'));
+    const fb = el.dataset.fb;                 // فارغ = احذف الصورة فقط بلا بديل
+    if(fb) el.insertAdjacentHTML('afterend', art(fb));
     el.remove();
   }catch(e){}
 }
@@ -166,7 +167,10 @@ function viewHome(){
         <h2>نتعامل مع أفضل الماركات العالمية والمحلية</h2>
       </div></div>
       <div class="marquee"><div class="marquee-t">
-        ${[...BRANDS, ...BRANDS].map(b => `<div class="bchip"><b>${esc(b.name)}</b><small>${esc(b.ar)}</small></div>`).join('')}
+        ${[...BRANDS, ...BRANDS].map(b => `<div class="bchip">
+          ${(b.logoData || b.logo) ? `<img class="blogo" src="${b.logoData || assetUrl(b.logo)}" alt="${esc(b.name)}" loading="lazy"
+             ${b.logo ? `data-orig="${esc(b.logo)}"` : ''} data-fb="" onerror="imgFallback(this)">` : ''}
+          <b>${esc(b.name)}</b><small>${esc(b.ar)}</small></div>`).join('')}
       </div></div>
     </div></section>
 
