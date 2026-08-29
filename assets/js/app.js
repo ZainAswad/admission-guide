@@ -5,10 +5,26 @@ const $    = (s, r = document) => r.querySelector(s);
 const $$   = (s, r = document) => [...r.querySelectorAll(s)];
 const esc  = s => String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
 
-/* ---------- صورة المنتج ---------- */
-function media(p){
-  const src = p.imgData || p.image;   // imgData تُستخدم فقط أثناء المعاينة من لوحة التحكم
-  return src ? `<img src="${src}" alt="${esc(p.name)}" loading="lazy" decoding="async">` : art(p.icon);
+/* ---------- صورة المنتج ----------
+   ASSET_REV: يتغيّر عند الحاجة لتجاوز نسخ محفوظة قديمة في متصفحات الزوار.  */
+const ASSET_REV = '2';
+function assetUrl(u){
+  if(!u || /^(https?:|data:|blob:)/.test(u) || u.includes('?')) return u;
+  return u + '?v=' + ASSET_REV;
+}
+/* إن تعذّر تحميل صورة المنتج نعرض الرسمة التوضيحية بدل أيقونة الصورة المكسورة */
+function imgFallback(el){
+  try{
+    el.insertAdjacentHTML('afterend', art(el.dataset.fb || 'junction'));
+    el.remove();
+  }catch(e){}
+}
+function media(p, cls){
+  const src = p.imgData || assetUrl(p.image);   // imgData تُستخدم فقط أثناء المعاينة من لوحة التحكم
+  return src
+    ? `<img${cls ? ` class="${cls}"` : ''} src="${src}" alt="${esc(p.name)}" loading="lazy" decoding="async"
+        data-fb="${esc(p.icon || 'junction')}" onerror="imgFallback(this)">`
+    : art(p.icon);
 }
 function subLabel(p){
   const s = subInfo(p.cats[0]);
@@ -99,7 +115,7 @@ function viewHome(){
   const fresh= PRODUCTS.filter(p => p.badge === 'new').slice(0, 10);
   return `<section class="hero"><div class="wrap"><div class="hero-in">
       <div>
-        <img class="hero-logo" src="assets/img/logo.png" alt="${esc(SITE.name)}" width="96" height="90">
+        <img class="hero-logo" src="${assetUrl('assets/img/logo.png')}" alt="${esc(SITE.name)}" width="96" height="90">
         <div class="tag-pill">${icon('bolt')}<span>${esc(SITE.tagline)}</span></div>
         <h1>${esc(SITE.shortName)} <span class="hl">للكهربائيات والإنارة الحديثة</span></h1>
         <p class="lead">${esc(SITE.about)}</p>
@@ -590,7 +606,7 @@ function tileHTML(item, i){
   const p = item;
   return `<a class="bt-in bt-fade" href="#/p/${p.id}">
     <span class="bt-bg" style="background:linear-gradient(160deg,${a},${b})"></span>
-    ${(p.imgData || p.image) ? `<img class="bt-img" src="${p.imgData || p.image}" alt="${esc(p.name)}" loading="lazy" decoding="async">` : art(p.icon)}
+    ${(p.imgData || p.image) ? media(p, 'bt-img') : art(p.icon)}
     <span class="bt-lbl"><b>${esc(p.name)}</b><small>${money(p.price)} ${SITE.currency}</small></span></a>`;
 }
 function initBento(){

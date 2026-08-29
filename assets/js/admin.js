@@ -10,6 +10,15 @@ const money = n => new Intl.NumberFormat('en-US').format(Math.round(n || 0));
 const norm = s => String(s || '').toLowerCase().replace(/[ً-ْـ]/g, '')
   .replace(/[أإآٱ]/g, 'ا').replace(/ى/g, 'ي').replace(/ة/g, 'ه').replace(/\s+/g, ' ').trim();
 
+const ASSET_REV = '2';
+function assetUrl(u){
+  if(!u || /^(https?:|data:|blob:)/.test(u) || u.includes('?')) return u;
+  return u + '?v=' + ASSET_REV;
+}
+function imgFallback(el){
+  try{ el.insertAdjacentHTML('afterend', art(el.dataset.fb || 'junction')); el.remove(); }catch(e){}
+}
+
 const DKEY = 'wz_draft_v1', TKEY = 'wz_gh_token', PKEY = 'wz_published_v1';
 const IMG_DIR = 'assets/img/products/';
 const DATA_PATH = 'assets/js/data.js';
@@ -276,7 +285,9 @@ function renderTable(){
     <div class="trow head"><span><input type="checkbox" id="selAll"${allSel ? ' checked' : ''} aria-label="تحديد الكل"></span><span>المادة</span><span>العلامة</span><span>السعر</span><span>الحالة</span><span></span></div>
     ${rows.length ? rows.map(p => `<div class="trow" data-row="${esc(p.id)}" role="button" tabindex="0">
       <span class="tsel"><input type="checkbox" data-sel="${esc(p.id)}"${sel.has(p.id) ? ' checked' : ''} aria-label="تحديد"></span>
-      <span class="tthumb">${p.imgData || p.image ? `<img src="${esc(p.imgData || p.image)}" alt="">` : art(p.icon)}</span>
+      <span class="tthumb">${p.imgData || p.image
+        ? `<img src="${esc(p.imgData || assetUrl(p.image))}" alt="" data-fb="${esc(p.icon || 'junction')}" onerror="imgFallback(this)">`
+        : art(p.icon)}</span>
       <span class="tname"><b>${esc(p.name)}</b><small>${esc(p.id)}</small>
         <span class="tcats">${p.cats.map(c => `<span>${esc(subName(c))}</span>`).join('')}</span></span>
       <span class="thide">${esc(p.brand)}</span>
@@ -368,7 +379,9 @@ function productSheet(id){
 
       <div><h4 style="font-size:14px;margin-bottom:8px">صورة المادة</h4>
         <div class="imgbox">
-          <div class="prev" id="imgPrev">${imgData || imgPath ? `<img src="${esc(imgData || imgPath)}" alt="">` : art(iconSel)}</div>
+          <div class="prev" id="imgPrev">${imgData || imgPath
+            ? `<img src="${esc(imgData || assetUrl(imgPath))}" alt="" data-fb="${esc(iconSel)}" onerror="imgFallback(this)">`
+            : art(iconSel)}</div>
           <div class="meta" id="imgMeta">${imgPath ? `الصورة الحالية: <code>${esc(imgPath)}</code>` : 'لا توجد صورة — تُستخدم الرسمة التوضيحية أدناه.'}</div>
           <div style="display:flex;gap:8px;flex-wrap:wrap">
             <label class="btn btn-sm btn-tonal">${icon('box')}<span>اختيار صورة</span>
@@ -910,11 +923,13 @@ async function publishToGitHub(){
 
   try{
     const imgs = D.PRODUCTS.filter(p => p.imgNew && p.imgData);
+    const uploaded = [];
     for(const p of imgs){
       const path = p.image || (IMG_DIR + p.id + '.jpg');
       await put(path, p.imgData.split(',')[1], `رفع صورة المادة ${p.id}`);
       say(`رُفعت صورة <b>${esc(p.name)}</b>`);
       p.image = path; delete p.imgNew;
+      uploaded.push({ path, name:p.name });
     }
     const res = await put(DATA_PATH, b64utf8(exportData()), 'تحديث بيانات المتجر من لوحة التحكم');
     say(`نُشر ملف البيانات بنجاح — <a href="${res.commit.html_url}" target="_blank" rel="noopener"><b>عرض التغيير على GitHub</b></a>`);
@@ -934,6 +949,12 @@ async function publishToGitHub(){
       localStorage.removeItem(DKEY); localStorage.removeItem(PKEY);
       awaitingSite = false;
       say('<b>تم — الموقع يعرض تغييراتك الآن.</b> افتح المتجر للتأكد بنفسك.');
+      for(const u of uploaded){
+        const ok = await imageLive(u.path);
+        say(ok ? `صورة <b>${esc(u.name)}</b> ظاهرة على الموقع.`
+               : `صورة <b>${esc(u.name)}</b> رُفعت لكنها لم تظهر بعد — ستظهر خلال دقيقة، وحتى ذلك الحين تُعرض رسمة توضيحية بدلاً منها.`,
+            ok ? 'note-info' : 'note-warn');
+      }
     } else {
       say('نُشرت التغييرات بنجاح، لكن الموقع لم يعرضها بعد (قد يحتاج دقيقة). بياناتك محفوظة ولن تضيع — اضغط «تحقّق مرة أخرى» بعد قليل.', 'note-warn');
       $('#pubLog').insertAdjacentHTML('beforeend',
@@ -1149,4 +1170,16 @@ function syncNotice(){
     if(ok){ localStorage.removeItem(DKEY); localStorage.removeItem(PKEY); location.reload(); }
     else { b.disabled = false; b.textContent = 'تحقّق الآن'; toast('لم يتحدّث بعد — أعد المحاولة بعد قليل', 'err'); }
   };
+}
+
+/* التأكد من أن صورة رُفعت صارت متاحة فعلاً على الموقع */
+async function imageLive(path, tries = 4){
+  for(let i = 0; i < tries; i++){
+    try{
+      const r = await fetch(path + '?ts=' + Date.now(), { cache:'no-store' });
+      if(r.ok && (r.headers.get('content-type') || '').startsWith('image/')) return true;
+    }catch(e){}
+    await new Promise(r => setTimeout(r, 4000));
+  }
+  return false;
 }
