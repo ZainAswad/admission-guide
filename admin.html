@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>لوحة التحكم — الوزني للكهربائيات</title>
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#0EBCBB">
+<link rel="icon" href="assets/img/favicon.png" type="image/png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap" media="print" onload="this.media='all'">
+<link rel="stylesheet" href="assets/css/styles.css">
+<link rel="stylesheet" href="assets/css/admin.css">
+</head>
+<body>
+
+<!-- ===== شاشة القفل ===== -->
+<div class="lock" id="lock" style="display:none">
+  <div class="lock-card" id="lockCard">
+    <img src="assets/img/logo.png" alt="شعار الوزني" width="88" height="82">
+    <h1>لوحة تحكم المتجر</h1>
+    <p>أدخل كلمة السر للمتابعة</p>
+    <form id="lockForm">
+      <div class="field">
+        <input id="lockPass" type="password" placeholder=" " autocomplete="current-password">
+        <label for="lockPass">كلمة السر</label>
+      </div>
+      <button class="btn btn-lg btn-block" type="submit">دخول</button>
+    </form>
+    <p style="margin-top:18px;margin-bottom:0;font-size:12px">
+      <a href="index.html" style="color:var(--brand-700);font-weight:800">العودة إلى المتجر</a>
+    </p>
+  </div>
+</div>
+
+<!-- ===== اللوحة ===== -->
+<div id="adm" style="display:none">
+  <header class="adm-bar">
+    <div class="wrap">
+      <div class="adm-bar-in">
+        <img src="assets/img/logo-sm.png" alt="" width="44" height="44">
+        <h1>لوحة تحكم المتجر <small>الوزني للكهربائيات والإنارة الحديثة</small></h1>
+        <span class="dirty-dot" title="توجد تغييرات غير منشورة"></span>
+        <div class="adm-actions">
+          <button class="btn btn-sm btn-tonal" id="btnPreview">معاينة المتجر</button>
+          <button class="btn btn-sm btn-ghost" id="btnDiscard">تجاهل التغييرات</button>
+          <a class="btn btn-sm btn-ghost" href="index.html">المتجر</a>
+          <button class="btn btn-sm btn-ghost" id="btnLock">قفل</button>
+        </div>
+      </div>
+      <nav class="tabs">
+        <button class="tab on" data-tab="products">المنتجات <span class="n" id="tabPCount">0</span></button>
+        <button class="tab" data-tab="cats">الأقسام <span class="n" id="tabCCount">0</span></button>
+        <button class="tab" data-tab="brands">العلامات التجارية <span class="n" id="tabBCount">0</span></button>
+        <button class="tab" data-tab="settings">إعدادات المحل</button>
+        <button class="tab" data-tab="publish">النشر</button>
+      </nav>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <!-- المنتجات -->
+    <section class="pane on" id="pane-products">
+      <div class="adm-head">
+        <div><h2>المنتجات</h2><p><span id="pCount">0</span> مادة معروضة — اضغط على أي مادة لتعديلها.</p></div>
+        <button class="btn" id="addProduct">إضافة مادة جديدة</button>
+      </div>
+      <div class="adm-tools" id="pTools"></div>
+      <div class="tbl" id="pTable"></div>
+    </section>
+
+    <!-- الأقسام -->
+    <section class="pane" id="pane-cats">
+      <div class="adm-head">
+        <div><h2>الأقسام</h2><p>أضف أقساماً رئيسية وفرعية حسب الحاجة — تظهر فوراً في الشريط العلوي والقائمة الجانبية.</p></div>
+        <button class="btn" id="addCat">إضافة قسم رئيسي</button>
+      </div>
+      <div class="note note-info">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M13.5 3 5 13.5h5.5L10 21l8.5-10.5H13z"/></svg>
+        <span>المادة الواحدة يمكن أن تنتمي لعدة أقسام. عند حذف قسم لا تُحذف المواد، بل يُزال ارتباطها به فقط.</span>
+      </div>
+      <div id="cList"></div>
+    </section>
+
+    <!-- العلامات -->
+    <section class="pane" id="pane-brands">
+      <div class="adm-head">
+        <div><h2>العلامات التجارية</h2><p>تظهر في الشريط المتحرك بالصفحة الرئيسية وفي فلتر المنتجات.</p></div>
+        <button class="btn" id="addBrand">إضافة علامة</button>
+      </div>
+      <div class="panel"><div class="panel-b" id="bList"></div></div>
+    </section>
+
+    <!-- الإعدادات -->
+    <section class="pane" id="pane-settings">
+      <div class="adm-head"><div><h2>إعدادات المحل</h2><p>الاسم، الأرقام، الموقع على الخريطة، أوقات الدوام، ورسوم التوصيل.</p></div></div>
+      <div class="panel"><div class="panel-b" id="setForm"></div></div>
+    </section>
+
+    <!-- النشر -->
+    <section class="pane" id="pane-publish">
+      <div class="adm-head"><div><h2>نشر التغييرات</h2><p>التعديلات محفوظة على هذا الجهاز فقط حتى تنشرها.</p></div></div>
+      <div id="pubBody"></div>
+    </section>
+  </main>
+</div>
+
+<!-- ===== نافذة التحرير ===== -->
+<div class="sheet" id="sheet" role="dialog" aria-modal="true">
+  <div class="sheet-bg"></div>
+  <div class="sheet-card">
+    <div class="sheet-h">
+      <h3 id="sheetTitle"></h3>
+      <button class="ibtn" data-x aria-label="إغلاق">
+        <svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="m6 6 12 12M18 6 6 18"/></svg>
+      </button>
+    </div>
+    <div class="sheet-b" id="sheetBody"></div>
+    <div class="sheet-f" id="sheetFoot"></div>
+  </div>
+</div>
+
+<div class="toasts" id="toasts" aria-live="polite"></div>
+
+<script src="assets/js/data.js"></script>
+<script src="assets/js/icons.js"></script>
+<script src="assets/js/admin.js"></script>
+</body>
+</html>

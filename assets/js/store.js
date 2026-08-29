@@ -1,6 +1,21 @@
 /* إدارة الحالة: السلة، المفضلة، الطلبات، والتخزين المحلي */
 
-const KEY = { cart:'wz_cart_v1', fav:'wz_fav_v1', orders:'wz_orders_v1', seq:'wz_seq_v1' };
+const KEY = { cart:'wz_cart_v1', fav:'wz_fav_v1', orders:'wz_orders_v1', seq:'wz_seq_v1', draft:'wz_draft_v1' };
+
+/* وضع المعاينة: يعرض مسودّة لوحة التحكم بدل البيانات المنشورة (لا يؤثر على الزوار) */
+let PREVIEW = false;
+(function applyDraft(){
+  try{
+    if(sessionStorage.getItem('wz_preview') !== '1') return;
+    const d = JSON.parse(localStorage.getItem(KEY.draft) || 'null');
+    if(!d) return;
+    if(d.SITE)       SITE       = d.SITE;
+    if(d.CATEGORIES) CATEGORIES = d.CATEGORIES;
+    if(d.BRANDS)     BRANDS     = d.BRANDS;
+    if(d.PRODUCTS)   PRODUCTS   = d.PRODUCTS;
+    PREVIEW = true;
+  }catch(e){}
+})();
 
 const store = {
   cart: [],   // [{id, q}]

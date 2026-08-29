@@ -7,7 +7,8 @@ const esc  = s => String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','
 
 /* ---------- صورة المنتج ---------- */
 function media(p){
-  return p.image ? `<img src="${p.image}" alt="${esc(p.name)}" loading="lazy" decoding="async">` : art(p.icon);
+  const src = p.imgData || p.image;   // imgData تُستخدم فقط أثناء المعاينة من لوحة التحكم
+  return src ? `<img src="${src}" alt="${esc(p.name)}" loading="lazy" decoding="async">` : art(p.icon);
 }
 function subLabel(p){
   const s = subInfo(p.cats[0]);
@@ -569,7 +570,7 @@ function reveal(){
 const TINTS = [['#EAF9F9','#FFFFFF'],['#FFFFFF','#EFF4F5'],['#E4F6F6','#F7FCFC'],['#F2F7F8','#FFFFFF']];
 function bentoPools(){
   const seen = new Set(), prods = [];
-  [...PRODUCTS.filter(p => p.image), ...PRODUCTS.filter(p => p.badge === 'hot'),
+  [...PRODUCTS.filter(p => p.imgData || p.image), ...PRODUCTS.filter(p => p.badge === 'hot'),
    ...PRODUCTS.filter(p => p.badge === 'new'), ...PRODUCTS.filter(p => p.old)]
     .forEach(p => { if(!seen.has(p.id)){ seen.add(p.id); prods.push(p); } });
   const cats = [];
@@ -589,7 +590,7 @@ function tileHTML(item, i){
   const p = item;
   return `<a class="bt-in bt-fade" href="#/p/${p.id}">
     <span class="bt-bg" style="background:linear-gradient(160deg,${a},${b})"></span>
-    ${p.image ? `<img class="bt-img" src="${p.image}" alt="${esc(p.name)}" loading="lazy" decoding="async">` : art(p.icon)}
+    ${(p.imgData || p.image) ? `<img class="bt-img" src="${p.imgData || p.image}" alt="${esc(p.name)}" loading="lazy" decoding="async">` : art(p.icon)}
     <span class="bt-lbl"><b>${esc(p.name)}</b><small>${money(p.price)} ${SITE.currency}</small></span></a>`;
 }
 function initBento(){
@@ -865,6 +866,7 @@ async function copy(text){
 /* ================= الإقلاع ================= */
 function boot(){
   store.load();
+  if(typeof PREVIEW !== 'undefined' && PREVIEW) showPreviewBar();
   buildDrawer();
   buildFooter();
   bindGlobal();
@@ -873,6 +875,18 @@ function boot(){
   addEventListener('hashchange', () => { flt = { sort:'pop', brand:'' }; render(); });
   render();
   document.getElementById('boot')?.remove();
+}
+
+function showPreviewBar(){
+  const el = document.createElement('div');
+  el.id = 'previewBar';
+  el.innerHTML = `${icon('bolt')}<span>وضع المعاينة — تشاهد مسودّة لوحة التحكم، وهذه التغييرات <b>غير منشورة</b> للزبائن.</span>
+    <a class="btn btn-sm" href="admin.html">لوحة التحكم</a>
+    <button class="btn btn-sm btn-ghost" id="exitPreview">خروج من المعاينة</button>`;
+  document.body.prepend(el);
+  document.getElementById('exitPreview').addEventListener('click', () => {
+    sessionStorage.removeItem('wz_preview'); location.reload();
+  });
 }
 
 function buildFooter(){
