@@ -48,11 +48,14 @@ function toast(msg, type){
 }
 function confirmBox(title, text, okLabel = 'تأكيد', danger = true){
   return new Promise(res => {
+    let done = false;
+    const finish = v => { if(done) return; done = true; res(v); };
     openSheet(title, `<p style="font-size:14.5px;line-height:1.8">${esc(text)}</p>`,
       `<button class="btn btn-ghost" data-x>إلغاء</button>
        <button class="btn ${danger ? 'btn-danger' : ''}" id="cfmOk">${esc(okLabel)}</button>`);
-    $('#cfmOk').onclick = () => { closeSheet(); res(true); };
-    $('#sheet').addEventListener('sheetclose', () => res(false), { once:true });
+    // نُنهي الوعد قبل الإغلاق، لأن الإغلاق نفسه يُطلق حدث sheetclose
+    $('#cfmOk').onclick = () => { finish(true); closeSheet(); };
+    $('#sheet').addEventListener('sheetclose', () => finish(false), { once:true });
   });
 }
 
@@ -196,6 +199,7 @@ function exportData(){
 
 /* ============ تبويب المنتجات ============ */
 let pf = { q:'', cat:'', brand:'', sort:'new' };
+let sel = new Set();
 
 function subName(key){
   const [c, s] = String(key).split('/');
@@ -243,9 +247,12 @@ function renderProducts(){
 function renderTable(){
   const rows = filteredProducts();
   $('#pCount').textContent = rows.length;
+  renderBulk(rows);
+  const allSel = rows.length > 0 && rows.every(p => sel.has(p.id));
   $('#pTable').innerHTML = `
-    <div class="trow head"><span></span><span>المادة</span><span>العلامة</span><span>السعر</span><span>الحالة</span><span></span></div>
+    <div class="trow head"><span><input type="checkbox" id="selAll"${allSel ? ' checked' : ''} aria-label="تحديد الكل"></span><span>المادة</span><span>العلامة</span><span>السعر</span><span>الحالة</span><span></span></div>
     ${rows.length ? rows.map(p => `<div class="trow" data-row="${esc(p.id)}" role="button" tabindex="0">
+      <span class="tsel"><input type="checkbox" data-sel="${esc(p.id)}"${sel.has(p.id) ? ' checked' : ''} aria-label="تحديد"></span>
       <span class="tthumb">${p.imgData || p.image ? `<img src="${esc(p.imgData || p.image)}" alt="">` : art(p.icon)}</span>
       <span class="tname"><b>${esc(p.name)}</b><small>${esc(p.id)}</small>
         <span class="tcats">${p.cats.map(c => `<span>${esc(subName(c))}</span>`).join('')}</span></span>
@@ -257,6 +264,27 @@ function renderTable(){
         <button class="ibtn del" data-del="${esc(p.id)}" title="حذف">${icon('trash')}</button>
       </span></div>`).join('')
     : `<div style="padding:44px;text-align:center;color:var(--grey)">لا توجد مواد مطابقة للبحث</div>`}`;
+}
+function renderBulk(rows){
+  const bar = $('#bulkBar');
+  const shown = rows.filter(p => sel.has(p.id)).length;
+  if(!sel.size){ bar.classList.remove('on'); bar.innerHTML = ''; return; }
+  bar.classList.add('on');
+  bar.innerHTML = `<b>حُدِّدت ${sel.size} مادة${shown !== sel.size ? ` (${shown} منها ظاهرة الآن)` : ''}</b>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-inline-start:auto">
+      <button class="btn btn-sm btn-ghost" id="bulkNone">إلغاء التحديد</button>
+      <button class="btn btn-sm btn-danger" id="bulkDel">${icon('trash')}<span>حذف المحدد (${sel.size})</span></button>
+    </div>`;
+  $('#bulkNone').onclick = () => { sel.clear(); renderTable(); };
+  $('#bulkDel').onclick = async () => {
+    if(await confirmBox('حذف المواد المحددة',
+      `سيُحذف ${sel.size} مادة نهائياً من المتجر. يمكنك التراجع بزر «تجاهل التغييرات» ما دمت لم تنشر بعد.`, `حذف ${sel.size} مادة`)){
+      D.PRODUCTS = D.PRODUCTS.filter(p => !sel.has(p.id));
+      const n = sel.size; sel.clear();
+      saveDraft(); renderTable(); renderStats(); renderProducts();
+      toast(`حُذفت ${n} مادة`, 'ok');
+    }
+  };
 }
 function badgeName(b){ return b === 'hot' ? 'الأكثر طلباً' : b === 'new' ? 'جديد' : b === 'sale' ? 'تخفيض' : ''; }
 
@@ -702,24 +730,45 @@ function renderPublish(){
     </div>
 
     <div class="panel" style="margin-bottom:18px">
-      <div class="panel-h"><h3>الطريقة الأولى — النشر المباشر (موصى بها)</h3></div>
+      <div class="panel-h"><h3>${tok ? 'النشر' : 'التوصيل — خطوة واحدة لمرة واحدة'}</h3>
+        ${tok ? '<span class="okpill">متصل</span>' : ''}</div>
       <div class="panel-b">
-        <p style="color:var(--grey);font-size:13.5px;margin-bottom:14px">
-          تنشر التغييرات إلى GitHub بضغطة واحدة، ويُحدَّث الموقع تلقائياً خلال ثوانٍ عبر Vercel — من الهاتف أو الحاسبة.</p>
-        <div class="note note-warn">${icon('shield')}<span>
-          يُحفظ المفتاح في هذا المتصفح فقط ولا يُرسل إلا إلى <code>api.github.com</code>.
-          استخدم مفتاحاً محدود الصلاحية: <b>Fine-grained token</b> لهذا المستودع وحده وصلاحية <code>Contents: Read and write</code>.
-          لا تستخدم لوحة التحكم على جهاز مشترك.</span></div>
-        <div class="f2" style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:12px">
-          <div class="field"><input id="ghRepo" placeholder=" " value="${esc(D.SITE.admin.repo)}" dir="ltr"><label>المستودع (owner/repo)</label></div>
-          <div class="field"><input id="ghBranch" placeholder=" " value="${esc(D.SITE.admin.branch)}" dir="ltr"><label>الفرع</label></div>
-        </div>
-        <div class="field" style="margin-bottom:12px"><input id="ghTok" type="password" placeholder=" " value="${esc(tok)}" dir="ltr" autocomplete="off"><label>مفتاح GitHub (Personal Access Token)</label></div>
-        <div style="display:flex;gap:10px;flex-wrap:wrap">
-          <button class="btn btn-lg" id="pubGo">${icon('bolt')}<span>نشر التغييرات الآن</span></button>
-          <button class="btn btn-ghost" id="tokClear">${icon('trash')}<span>مسح المفتاح</span></button>
-          <a class="btn btn-ghost" href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">${icon('copy')}<span>إنشاء مفتاح</span></a>
-        </div>
+        ${tok ? `
+          <p style="color:var(--grey);font-size:13.5px;margin-bottom:14px">
+            لوحتك موصولة. اضغط الزر وستظهر تعديلاتك على الموقع خلال ثوانٍ — من الهاتف أو الحاسبة.</p>
+          <div style="display:flex;gap:10px;flex-wrap:wrap">
+            <button class="btn btn-lg" id="pubGo">${icon('bolt')}<span>نشر التغييرات الآن</span></button>
+            <button class="btn btn-ghost" id="ghTest">${icon('check')}<span>اختبار الاتصال</span></button>
+            <button class="btn btn-ghost" id="tokClear">${icon('trash')}<span>فصل هذا الجهاز</span></button>
+          </div>
+          <details style="margin-top:16px">
+            <summary style="cursor:pointer;font-weight:800;font-size:13.5px;color:var(--grey)">إعدادات متقدمة</summary>
+            <div class="f2" style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:12px">
+              <div class="field"><input id="ghRepo" placeholder=" " value="${esc(D.SITE.admin.repo)}" dir="ltr"><label>المستودع</label></div>
+              <div class="field"><input id="ghBranch" placeholder=" " value="${esc(D.SITE.admin.branch)}" dir="ltr"><label>الفرع</label></div>
+            </div>
+            <div class="field"><input id="ghTok" type="password" placeholder=" " value="${esc(tok)}" dir="ltr" autocomplete="off"><label>المفتاح</label></div>
+          </details>
+        ` : `
+          <p style="font-size:14px;line-height:1.85;margin-bottom:18px">
+            لتنشر تعديلاتك بضغطة زر، تحتاج <b>توصيل اللوحة بحسابك مرة واحدة فقط</b>.
+            بعدها لن تعيد هذه الخطوة أبداً على هذا الجهاز.</p>
+          <ol class="steps" style="margin-bottom:18px">
+            <li><b>اضغط الزر الأخضر أدناه.</b> ستُفتح صفحة GitHub وكل الخيارات مضبوطة مسبقاً — انزل للأسفل واضغط <b>Generate token</b>.</li>
+            <li><b>انسخ السطر</b> الذي يظهر لك (يبدأ بـ <code>ghp_</code>). يظهر مرة واحدة فقط.</li>
+            <li><b>الصقه في الحقل أدناه</b> واضغط «توصيل».</li>
+          </ol>
+          <a class="btn btn-lg" style="--bg-c:#1FAF54" target="_blank" rel="noopener"
+             href="https://github.com/settings/tokens/new?scopes=repo&description=%D9%84%D9%88%D8%AD%D8%A9%20%D8%AA%D8%AD%D9%83%D9%85%20%D9%85%D8%AA%D8%AC%D8%B1%20%D8%A7%D9%84%D9%88%D8%B2%D9%86%D9%8A">
+            ${icon('shield')}<span>الخطوة 1 — فتح صفحة إنشاء المفتاح</span></a>
+          <div class="field" style="margin:18px 0 12px"><input id="ghTok" type="password" placeholder=" " dir="ltr" autocomplete="off"><label>الخطوة 2 — الصق المفتاح هنا</label></div>
+          <input type="hidden" id="ghRepo" value="${esc(D.SITE.admin.repo)}">
+          <input type="hidden" id="ghBranch" value="${esc(D.SITE.admin.branch)}">
+          <button class="btn btn-lg btn-block" id="ghTest">${icon('check')}<span>الخطوة 3 — توصيل</span></button>
+          <div class="note note-warn" style="margin-top:16px">${icon('shield')}<span>
+            المفتاح يُحفظ في هذا المتصفح فقط ولا يُرسل إلا إلى <code>api.github.com</code>.
+            لا تستخدم اللوحة على جهاز مشترك، وإن اضطررت فاضغط «فصل هذا الجهاز» بعد الانتهاء.</span></div>
+        `}
         <div id="pubLog" style="margin-top:14px"></div>
       </div>
     </div>
@@ -744,8 +793,10 @@ function renderPublish(){
       </div>
     </div>`;
 
-  $('#pubGo').onclick   = publishToGitHub;
-  $('#tokClear').onclick = () => { localStorage.removeItem(TKEY); $('#ghTok').value = ''; toast('مُسح المفتاح من هذا الجهاز', 'ok'); };
+  const goBtn = $('#pubGo'); if(goBtn) goBtn.onclick = publishToGitHub;
+  const tcBtn = $('#tokClear'); if(tcBtn) tcBtn.onclick = () => {
+    localStorage.removeItem(TKEY); toast('فُصل هذا الجهاز', 'ok'); renderPublish(); };
+  const testBtn = $('#ghTest'); if(testBtn) testBtn.onclick = testConnection;
   $('#dlData').onclick  = () => download('data.js', new Blob([exportData()], { type:'text/javascript;charset=utf-8' }));
   $('#dlBackup').onclick = () => download('wazani-backup-' + new Date().toISOString().slice(0, 10) + '.json',
     new Blob([JSON.stringify(D, null, 2)], { type:'application/json' }));
@@ -854,7 +905,10 @@ async function publishToGitHub(){
     renderAll();
     toast('نُشرت التغييرات بنجاح', 'ok');
   }catch(err){
-    say('فشل النشر — ' + esc(err.message), 'note-warn');
+    const msg = /Failed to fetch|NetworkError|Load failed/i.test(err.message)
+      ? 'تعذّر الوصول إلى GitHub — تأكد من اتصالك بالإنترنت ثم أعد المحاولة.'
+      : esc(err.message);
+    say('فشل النشر — ' + msg, 'note-warn');
     say('تحقّق من صلاحية المفتاح (Contents: Read and write) وأن اسم المستودع والفرع صحيحان.', 'note-warn');
     toast('فشل النشر', 'err');
   }finally{
@@ -886,9 +940,20 @@ function bind(){
     if(t.closest('[data-x]') || t.closest('.sheet-bg')) return closeSheet();
 
     if(t.closest('#addProduct')) return productSheet(null);
+    if(t.id === 'selAll'){
+      const rows = filteredProducts();
+      if(t.checked) rows.forEach(p => sel.add(p.id)); else rows.forEach(p => sel.delete(p.id));
+      renderTable(); return;
+    }
+    const sb = t.closest('[data-sel]');
+    if(sb){
+      const id = sb.dataset.sel;
+      sb.checked ? sel.add(id) : sel.delete(id);
+      renderBulk(filteredProducts()); return;
+    }
     const ed = t.closest('[data-edit]'); if(ed) return productSheet(ed.dataset.edit);
     const row = t.closest('[data-row]');
-    if(row && !t.closest('[data-del]')) return productSheet(row.dataset.row);
+    if(row && !t.closest('[data-del]') && !t.closest('.tsel')) return productSheet(row.dataset.row);
     const dl = t.closest('[data-del]');
     if(dl){
       const p = D.PRODUCTS.find(x => x.id === dl.dataset.del); if(!p) return;
@@ -970,3 +1035,44 @@ function boot(){
   initLock();
 }
 document.readyState === 'loading' ? addEventListener('DOMContentLoaded', boot) : boot();
+
+/* ============ اختبار الاتصال بـ GitHub ============ */
+async function testConnection(){
+  const repo = $('#ghRepo').value.trim();
+  const branch = ($('#ghBranch').value || 'main').trim();
+  const token = $('#ghTok').value.trim();
+  const log = $('#pubLog');
+  const say = (m, cls) => { log.innerHTML =
+    `<div class="note ${cls || 'note-info'}" style="margin:0">${icon(cls === 'note-warn' ? 'close' : 'check')}<span>${m}</span></div>`; };
+  if(!token){ say('الصق المفتاح أولاً.', 'note-warn'); return; }
+  const btn = $('#ghTest'); btn.disabled = true;
+  const lbl = btn.querySelector('span'); const old = lbl.textContent; lbl.textContent = 'جارٍ الفحص…';
+  try{
+    const r = await fetch(`https://api.github.com/repos/${repo}`, {
+      headers:{ Authorization:'Bearer ' + token, Accept:'application/vnd.github+json' } });
+    if(r.status === 401) throw new Error('المفتاح غير صحيح أو منتهي — أنشئ مفتاحاً جديداً.');
+    if(r.status === 404) throw new Error(`لم يُعثر على المستودع <code>${esc(repo)}</code>، أو المفتاح لا يملك صلاحية عليه.`);
+    if(!r.ok) throw new Error('استجابة غير متوقعة من GitHub (' + r.status + ')');
+    const j = await r.json();
+    if(!j.permissions || !j.permissions.push)
+      throw new Error('المفتاح يقرأ فقط ولا يستطيع الكتابة — تأكد من تفعيل صلاحية <code>repo</code>.');
+    const br = await fetch(`https://api.github.com/repos/${repo}/branches/${encodeURIComponent(branch)}`, {
+      headers:{ Authorization:'Bearer ' + token, Accept:'application/vnd.github+json' } });
+    if(br.status === 404) throw new Error(`المستودع سليم لكن لا يوجد فرع باسم <code>${esc(branch)}</code>.`);
+    localStorage.setItem(TKEY, token);
+    D.SITE.admin.repo = repo; D.SITE.admin.branch = branch;
+    saveDraft();
+    toast('تم التوصيل بنجاح', 'ok');
+    renderPublish();
+    $('#pubLog').innerHTML =
+      `<div class="note note-info" style="margin:0">${icon('check')}<span>
+        <b>تم التوصيل بنجاح.</b> من الآن يكفي زر «نشر التغييرات الآن» — لن تعيد هذه الخطوة على هذا الجهاز.</span></div>`;
+  }catch(err){
+    const msg = /Failed to fetch|NetworkError|Load failed/i.test(err.message)
+      ? 'تعذّر الوصول إلى GitHub — تأكد من اتصالك بالإنترنت ثم أعد المحاولة.'
+      : err.message;
+    say(msg, 'note-warn');
+  }finally{
+    const b = $('#ghTest'); if(b){ b.disabled = false; const l = b.querySelector('span'); if(l) l.textContent = old; }
+  }
+}
