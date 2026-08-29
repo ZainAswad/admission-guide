@@ -1,6 +1,6 @@
 /* =============================================================
    الوزني لتجارة الكهربائيات والإنارة الحديثة
-   ملف البيانات — وُلّد من لوحة التحكم بتاريخ ٢٩‏/٨‏/٢٠٢٦، ٣:٥٤:٣٢ م
+   ملف البيانات — وُلّد من لوحة التحكم بتاريخ ٢٩‏/٨‏/٢٠٢٦، ٣:٥٥:٥٧ م
    يمكن تعديله يدوياً أيضاً، أو من admin.html
    ============================================================= */
 
@@ -19,13 +19,13 @@ let SITE = {
   address: 'كربلاء المقدسة — الحسينية — الطف — عمود 235',
   city: 'كربلاء المقدسة',
   hours: [
-    { d: 'جميع ايام الاسبوع', t: '8:00 صباحاً — 11:00 مساءً' },
-    { d: 'الجمعة', t: '10:00 صباحاً — 10:00 مساءً' }
+    { d: 'السبت — الخميس', t: '9:00 صباحاً — 9:00 مساءً' },
+    { d: 'الجمعة', t: '4:00 عصراً — 9:00 مساءً' }
   ],
   geo: { lat: 32.7161, lng: 44.0489, zoom: 15 },
   social: [
     { id: 'facebook', name: 'فيسبوك', url: '' },
-    { id: 'instagram', name: 'انستغرام', url: 'https://www.instagram.com/alwazny.electric?igsi=dHNhaDZlNXdxajBo' },
+    { id: 'instagram', name: 'انستغرام', url: '' },
     { id: 'tiktok', name: 'تيك توك', url: '' },
     { id: 'telegram', name: 'تيليكرام', url: '' }
   ],
@@ -39,7 +39,7 @@ let SITE = {
     prefix: 'WZ',
     minOrder: 0,
     deliveryFeeInCity: 5000,
-    deliveryFeeOutCity: 6000,
+    deliveryFeeOutCity: 15000,
     freeDeliveryOver: 250000,
     webhook: ''
   },
@@ -147,7 +147,5 @@ let BRANDS = [
 
 /* ---------- 4) المنتجات ---------- */
 let PRODUCTS = [
-  { id: 'LT-101', name: 'مصباح ثريا 5W', brand: 'AkkoStar', price: 1500, icon: 'bulb', unit: 'قطعة', image: 'assets/img/products/LT-101.jpg',
-    cats: ['lighting/bulbs'], desc: 'مصباح ثريا 5W متغير ثلالث الوان (ابيض - اوف وايت - شمسي)',
-    specs: ['5 واط'] }
+
 ];
