@@ -1,6 +1,6 @@
 /* =============================================================
    الوزني لتجارة الكهربائيات والإنارة الحديثة
-   ملف البيانات — وُلّد من لوحة التحكم بتاريخ ٢٩‏/٨‏/٢٠٢٦، ١١:٣٦:٠٨ م
+   ملف البيانات — وُلّد من لوحة التحكم بتاريخ ٣٠‏/٨‏/٢٠٢٦، ١٢:٠٠:٣٥ ص
    يمكن تعديله يدوياً أيضاً، أو من admin.html
    ============================================================= */
 
@@ -137,7 +137,8 @@ let BRANDS = [
   { name: 'Al-Fanar', ar: 'الفنار', logo: 'assets/img/brands/fanar.png' },
   { name: 'Aqaba', ar: 'العقبة', logo: 'assets/img/brands/aqaba.png' },
   { name: 'Almustaqbal', ar: 'المستقبل السعودي', logo: 'assets/img/brands/mustaqbal.png' },
-  { name: 'Ingco', ar: 'إنجكو', logo: 'assets/img/brands/ingco.png' }
+  { name: 'Ingco', ar: 'إنجكو', logo: 'assets/img/brands/ingco.png' },
+  { name: 'CHINT', ar: 'جاينت', logo: 'assets/img/brands/chint.png' }
 ];
 
 /* ---------- 4) المنتجات ---------- */
