@@ -7,7 +7,7 @@ const esc  = s => String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','
 
 /* ---------- صورة المنتج ----------
    ASSET_REV: يتغيّر عند الحاجة لتجاوز نسخ محفوظة قديمة في متصفحات الزوار.  */
-const ASSET_REV = '2';
+const ASSET_REV = '3';
 function assetUrl(u){
   if(!u || /^(https?:|data:|blob:)/.test(u) || u.includes('?')) return u;
   return u + '?v=' + ASSET_REV;

@@ -10,7 +10,7 @@ const money = n => new Intl.NumberFormat('en-US').format(Math.round(n || 0));
 const norm = s => String(s || '').toLowerCase().replace(/[ً-ْـ]/g, '')
   .replace(/[أإآٱ]/g, 'ا').replace(/ى/g, 'ي').replace(/ة/g, 'ه').replace(/\s+/g, ' ').trim();
 
-const ASSET_REV = '2';
+const ASSET_REV = '3';
 function assetUrl(u){
   if(!u || /^(https?:|data:|blob:)/.test(u) || u.includes('?')) return u;
   return u + '?v=' + ASSET_REV;
