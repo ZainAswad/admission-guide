@@ -172,3 +172,11 @@ details summary::-webkit-details-marker{display:none}
 .awaitbar .ic{width:18px;height:18px;color:var(--brand);flex:none}
 .awaitbar b{color:#fff}
 .awaitbar .btn{--bg-c:var(--brand);--fg-c:#04302F;margin-inline-start:auto}
+
+.diagrow{display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid var(--line-2);font-size:13.5px}
+.diagrow:last-child{border-bottom:0}
+.diagrow b{min-width:130px;flex:none}
+.diagrow span[dir]{color:var(--grey);word-break:break-all}
+.diagrow .dot{width:9px;height:9px;border-radius:50%;flex:none;margin-top:6px}
+.diagrow .dot.ok{background:#12B76A}
+.diagrow .dot.bad{background:var(--danger)}

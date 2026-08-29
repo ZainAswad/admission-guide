@@ -12,9 +12,21 @@ function assetUrl(u){
   if(!u || /^(https?:|data:|blob:)/.test(u) || u.includes('?')) return u;
   return u + '?v=' + ASSET_REV;
 }
-/* إن تعذّر تحميل صورة المنتج نعرض الرسمة التوضيحية بدل أيقونة الصورة المكسورة */
+/* مصدر احتياطي للصور من شبكة jsDelivr مباشرة من المستودع (شبكة أمان فقط) */
+function cdnUrl(path){
+  const a = (typeof SITE !== 'undefined' && SITE.admin) || {};
+  if(!a.repo || !/^[\w.-]+\/[\w.-]+$/.test(a.repo)) return '';
+  return `https://cdn.jsdelivr.net/gh/${a.repo}@${a.branch || 'main'}/`
+       + String(path).replace(/^\/+/, '').split('?')[0];
+}
+/* إن تعذّر تحميل صورة المنتج: نجرّب المصدر الاحتياطي، ثم الرسمة التوضيحية
+   بدل أيقونة الصورة المكسورة. */
 function imgFallback(el){
   try{
+    if(!el.dataset.tried && el.dataset.orig){
+      const alt = cdnUrl(el.dataset.orig);
+      if(alt){ el.dataset.tried = '1'; el.src = alt; return; }
+    }
     el.insertAdjacentHTML('afterend', art(el.dataset.fb || 'junction'));
     el.remove();
   }catch(e){}
@@ -23,7 +35,7 @@ function media(p, cls){
   const src = p.imgData || assetUrl(p.image);   // imgData تُستخدم فقط أثناء المعاينة من لوحة التحكم
   return src
     ? `<img${cls ? ` class="${cls}"` : ''} src="${src}" alt="${esc(p.name)}" loading="lazy" decoding="async"
-        data-fb="${esc(p.icon || 'junction')}" onerror="imgFallback(this)">`
+        data-fb="${esc(p.icon || 'junction')}"${p.image ? ` data-orig="${esc(p.image)}"` : ''} onerror="imgFallback(this)">`
     : art(p.icon);
 }
 function subLabel(p){

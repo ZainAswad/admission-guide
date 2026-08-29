@@ -15,8 +15,21 @@ function assetUrl(u){
   if(!u || /^(https?:|data:|blob:)/.test(u) || u.includes('?')) return u;
   return u + '?v=' + ASSET_REV;
 }
+function cdnUrl(path){
+  const a = (D && D.SITE && D.SITE.admin) || (typeof SITE !== 'undefined' && SITE.admin) || {};
+  if(!a.repo || !/^[\w.-]+\/[\w.-]+$/.test(a.repo)) return '';
+  return `https://cdn.jsdelivr.net/gh/${a.repo}@${a.branch || 'main'}/`
+       + String(path).replace(/^\/+/, '').split('?')[0];
+}
 function imgFallback(el){
-  try{ el.insertAdjacentHTML('afterend', art(el.dataset.fb || 'junction')); el.remove(); }catch(e){}
+  try{
+    if(!el.dataset.tried && el.dataset.orig){
+      const alt = cdnUrl(el.dataset.orig);
+      if(alt){ el.dataset.tried = '1'; el.src = alt; return; }
+    }
+    el.insertAdjacentHTML('afterend', art(el.dataset.fb || 'junction'));
+    el.remove();
+  }catch(e){}
 }
 
 const DKEY = 'wz_draft_v1', TKEY = 'wz_gh_token', PKEY = 'wz_published_v1';
@@ -286,7 +299,7 @@ function renderTable(){
     ${rows.length ? rows.map(p => `<div class="trow" data-row="${esc(p.id)}" role="button" tabindex="0">
       <span class="tsel"><input type="checkbox" data-sel="${esc(p.id)}"${sel.has(p.id) ? ' checked' : ''} aria-label="تحديد"></span>
       <span class="tthumb">${p.imgData || p.image
-        ? `<img src="${esc(p.imgData || assetUrl(p.image))}" alt="" data-fb="${esc(p.icon || 'junction')}" onerror="imgFallback(this)">`
+        ? `<img src="${esc(p.imgData || assetUrl(p.image))}" alt="" data-fb="${esc(p.icon || 'junction')}"${p.image ? ` data-orig="${esc(p.image)}"` : ''} onerror="imgFallback(this)">`
         : art(p.icon)}</span>
       <span class="tname"><b>${esc(p.name)}</b><small>${esc(p.id)}</small>
         <span class="tcats">${p.cats.map(c => `<span>${esc(subName(c))}</span>`).join('')}</span></span>
@@ -766,6 +779,19 @@ function renderPublish(){
     </div>
 
     <div class="panel" style="margin-bottom:18px">
+      <div class="panel-h"><h3>فحص الموقع</h3></div>
+      <div class="panel-b">
+        <p style="color:var(--grey);font-size:13.5px;margin-bottom:12px">
+          يفحص ما يقدّمه الموقع فعلاً الآن: ملف المواد وكل صورة منتج، ويعرض رابط متجرك.</p>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <button class="btn" id="diagGo">${icon('shield')}<span>افحص الموقع الآن</span></button>
+          <button class="btn btn-ghost" id="diagCopy" style="display:none">${icon('copy')}<span>نسخ النتيجة</span></button>
+        </div>
+        <div id="diagOut" style="margin-top:14px"></div>
+      </div>
+    </div>
+
+    <div class="panel" style="margin-bottom:18px">
       <div class="panel-h"><h3>${tok ? 'النشر' : 'التوصيل — خطوة واحدة لمرة واحدة'}</h3>
         ${tok ? '<span class="okpill">متصل</span>' : ''}</div>
       <div class="panel-b">
@@ -833,6 +859,7 @@ function renderPublish(){
   const tcBtn = $('#tokClear'); if(tcBtn) tcBtn.onclick = () => {
     localStorage.removeItem(TKEY); toast('فُصل هذا الجهاز', 'ok'); renderPublish(); };
   const testBtn = $('#ghTest'); if(testBtn) testBtn.onclick = testConnection;
+  const dg = $('#diagGo'); if(dg) dg.onclick = runDiagnostics;
   $('#dlData').onclick  = () => download('data.js', new Blob([exportData()], { type:'text/javascript;charset=utf-8' }));
   $('#dlBackup').onclick = () => download('wazani-backup-' + new Date().toISOString().slice(0, 10) + '.json',
     new Blob([JSON.stringify(D, null, 2)], { type:'application/json' }));
@@ -1182,4 +1209,74 @@ async function imageLive(path, tries = 4){
     await new Promise(r => setTimeout(r, 4000));
   }
   return false;
+}
+
+/* ============ فحص ما يقدّمه الموقع فعلاً ============ */
+let diagText = '';
+async function runDiagnostics(){
+  const btn = $('#diagGo'), out = $('#diagOut');
+  btn.disabled = true; btn.querySelector('span').textContent = 'جارٍ الفحص…';
+  const rows = [];
+  const add = (k, v, ok) => rows.push({ k, v, ok });
+
+  const isFile = location.protocol === 'file:';
+  add('رابط متجرك', isFile ? '(تفتح اللوحة من ملف محلي)' : location.origin, !isFile);
+
+  try{
+    const r = await fetch('assets/js/data.js?ts=' + Date.now(), { cache:'no-store' });
+    if(r.ok){
+      const t = await r.text();
+      const i = t.indexOf('let PRODUCTS');
+      const n = i > -1 ? (t.slice(i).match(/\{\s*id:/g) || []).length : 0;
+      add('ملف المواد', `يعمل — يحتوي ${n} مادة`, true);
+    } else add('ملف المواد', 'فشل (' + r.status + ')', false);
+  }catch(e){ add('ملف المواد', 'تعذّر الوصول', false); }
+
+  const withImg = D.PRODUCTS.filter(p => p.image);
+  if(!withImg.length) add('صور المنتجات', 'لا توجد مواد بصور بعد', true);
+  for(const p of withImg){
+    try{
+      const r = await fetch(p.image + '?ts=' + Date.now(), { cache:'no-store' });
+      const ct = (r.headers.get('content-type') || '').split(';')[0];
+      if(!r.ok) add(p.name, `الصورة غير موجودة على الموقع (${r.status}) — ${p.image}`, false);
+      else if(!ct.startsWith('image/')) add(p.name, `الخادم يُرجعها بنوع خاطئ: ${ct || 'غير محدد'}`, false);
+      else {
+        const size = (await r.blob()).size;
+        add(p.name, `الصورة تعمل — ${Math.round(size / 1024)} كيلوبايت، ${ct}`, true);
+      }
+      if(!r.ok || !ct.startsWith('image/')){
+        const alt = cdnUrl(p.image);
+        if(alt){
+          try{
+            const r2 = await fetch(alt, { cache:'no-store' });
+            add(p.name + ' (المصدر الاحتياطي)', r2.ok ? 'يعمل — ستظهر الصورة للزبائن' : 'لا يعمل أيضاً (' + r2.status + ')', r2.ok);
+          }catch(e){ add(p.name + ' (المصدر الاحتياطي)', 'تعذّر الوصول', false); }
+        }
+      }
+    }catch(e){ add(p.name, 'تعذّر الوصول إلى الصورة', false); }
+  }
+
+  const okAll = rows.every(r => r.ok);
+  out.innerHTML = `<div class="panel" style="box-shadow:none;border-color:${okAll ? 'var(--brand-100)' : '#F6D9A0'}">
+      <div class="panel-b" style="padding:14px 16px">
+        ${rows.map(r => `<div class="diagrow">
+          <span class="dot ${r.ok ? 'ok' : 'bad'}"></span>
+          <b>${esc(r.k)}</b><span dir="auto">${esc(r.v)}</span></div>`).join('')}
+      </div></div>
+    ${okAll ? '' : `<div class="note note-warn" style="margin-top:10px">${icon('close')}<span>
+      يوجد ما لا يعمل. اضغط «نسخ النتيجة» وأرسلها ليُحدَّد السبب بدقة.</span></div>`}`;
+  diagText = rows.map(r => `${r.ok ? '[✓]' : '[✗]'} ${r.k}: ${r.v}`).join('\n');
+  $('#diagCopy').style.display = '';
+  $('#diagCopy').onclick = () => copyText(diagText);
+  btn.disabled = false; btn.querySelector('span').textContent = 'افحص الموقع الآن';
+}
+async function copyText(t){
+  try{ await navigator.clipboard.writeText(t); toast('نُسخت النتيجة', 'ok'); }
+  catch(e){
+    const ta = document.createElement('textarea');
+    ta.value = t; ta.style.cssText = 'position:fixed;opacity:0';
+    document.body.appendChild(ta); ta.select();
+    try{ document.execCommand('copy'); toast('نُسخت النتيجة', 'ok'); }catch(_){ toast('تعذّر النسخ', 'err'); }
+    ta.remove();
+  }
 }
