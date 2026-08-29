@@ -196,7 +196,7 @@ function serializeData(d){
   L.push('');
   L.push('/* ---------- 1) إعدادات المتجر ---------- */');
   L.push('let SITE = {');
-  L.push(objLines(S, ['name','shortName','nameEn','tagline','about','currency'], 2) + ',');
+  L.push(objLines(S, ['name','shortName','nameEn','tagline','about','currency','siteUrl'], 2) + ',');
   L.push('  phones: [');
   L.push(S.phones.map(p => `    { label: ${q(p.label)}, number: ${q(p.number)}, intl: ${q(p.intl || '')} }`).join(',\n'));
   L.push('  ],');
