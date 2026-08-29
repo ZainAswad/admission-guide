@@ -147,5 +147,7 @@ let BRANDS = [
 
 /* ---------- 4) المنتجات ---------- */
 let PRODUCTS = [
-
+  { id: 'LT-101', name: 'مصباح ثريا 5W', brand: 'AkkoStar', price: 1500, icon: 'bulb', unit: 'قطعة', image: 'assets/img/products/LT-101.jpg',
+    cats: ['lighting/bulbs'], desc: 'مصباح ثريا 5W متغير ثلالث الوان (ابيض - اوف وايت - شمسي)',
+    specs: ['5 واط'] }
 ];

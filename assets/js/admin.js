@@ -10,7 +10,7 @@ const money = n => new Intl.NumberFormat('en-US').format(Math.round(n || 0));
 const norm = s => String(s || '').toLowerCase().replace(/[ً-ْـ]/g, '')
   .replace(/[أإآٱ]/g, 'ا').replace(/ى/g, 'ي').replace(/ة/g, 'ه').replace(/\s+/g, ' ').trim();
 
-const DKEY = 'wz_draft_v1', TKEY = 'wz_gh_token';
+const DKEY = 'wz_draft_v1', TKEY = 'wz_gh_token', PKEY = 'wz_published_v1';
 const IMG_DIR = 'assets/img/products/';
 const DATA_PATH = 'assets/js/data.js';
 
@@ -18,22 +18,45 @@ const DATA_PATH = 'assets/js/data.js';
 let D = null;          // المسودّة الحالية
 let PUB = null;        // البيانات المنشورة (كما هي في data.js)
 let dirty = false;
+let awaitingSite = false;   // نُشرت التغييرات لكن الموقع لم يعرضها بعد
 
 function markDirty(v = true){ dirty = v; document.body.classList.toggle('dirty', v); }
+
+/* نص قياسي للمقارنة (بدون سطر التاريخ وبدون بيانات الصور المؤقتة) */
+function coreOf(d){
+  const c = clone(d);
+  (c.PRODUCTS || []).forEach(p => { delete p.imgData; delete p.imgNew; });
+  return bodyOf(serializeData(c));
+}
+function bodyOf(text){ const i = text.indexOf('let SITE'); return (i > -1 ? text.slice(i) : text).trim(); }
 
 function loadState(){
   PUB = { SITE:clone(SITE), CATEGORIES:clone(CATEGORIES), BRANDS:clone(BRANDS), PRODUCTS:clone(PRODUCTS) };
   let d = null;
   try{ d = JSON.parse(localStorage.getItem(DKEY) || 'null'); }catch(e){}
-  D = d && d.PRODUCTS ? d : clone(PUB);
-  markDirty(!!d);
+  if(!d || !d.PRODUCTS){ D = clone(PUB); markDirty(false); awaitingSite = false; return; }
+
+  D = d;
+  const dc = coreOf(D);
+  if(dc === coreOf(PUB)){
+    // الموقع لحق بالمسودّة — ننظّفها بأمان
+    localStorage.removeItem(DKEY); localStorage.removeItem(PKEY);
+    D = clone(PUB); markDirty(false); awaitingSite = false;
+  } else if(dc === localStorage.getItem(PKEY)){
+    // نُشرت فعلاً لكن الموقع لم يُحدَّث بعد — نبقي عرض بياناتك ولا نُرجع القديم
+    markDirty(false); awaitingSite = true;
+  } else {
+    markDirty(true); awaitingSite = false;
+  }
 }
-function saveDraft(){
-  try{ localStorage.setItem(DKEY, JSON.stringify(D)); markDirty(true); }
-  catch(e){ toast('تعذّر الحفظ محلياً — قد تكون مساحة المتصفح ممتلئة بسبب الصور.', 'err'); }
+function writeDraft(){
+  try{ localStorage.setItem(DKEY, JSON.stringify(D)); return true; }
+  catch(e){ toast('تعذّر الحفظ محلياً — قد تكون مساحة المتصفح ممتلئة بسبب الصور.', 'err'); return false; }
 }
+function saveDraft(){ writeDraft(); awaitingSite = false; markDirty(true); }
 function discardDraft(){
-  localStorage.removeItem(DKEY); D = clone(PUB); markDirty(false); renderAll();
+  localStorage.removeItem(DKEY); localStorage.removeItem(PKEY);
+  D = clone(PUB); markDirty(false); awaitingSite = false; renderAll();
   toast('رجعت البيانات إلى آخر نسخة منشورة', 'ok');
 }
 
@@ -897,13 +920,32 @@ async function publishToGitHub(){
     say(`نُشر ملف البيانات بنجاح — <a href="${res.commit.html_url}" target="_blank" rel="noopener"><b>عرض التغيير على GitHub</b></a>`);
     say('سيُحدَّث الموقع تلقائياً خلال ثوانٍ عبر Vercel. حدّث صفحة المتجر للتأكد.');
 
-    D.PRODUCTS.forEach(p => delete p.imgData);
-    PUB = clone(D);
-    localStorage.removeItem(DKEY);
-    markDirty(false);
-    saveDraft(); localStorage.removeItem(DKEY); markDirty(false);
-    renderAll();
+    D.PRODUCTS.forEach(p => { delete p.imgData; delete p.imgNew; });
+    const sig = coreOf(D);
+    localStorage.setItem(PKEY, sig);
+    writeDraft();                 // نُبقي نسخة بياناتك حتى يعرضها الموقع
+    awaitingSite = true; markDirty(false);
+    renderStats(); renderProducts(); renderCats(); renderBrands();
     toast('نُشرت التغييرات بنجاح', 'ok');
+
+    say('نتأكد الآن من ظهور التغييرات على الموقع…');
+    const live = await verifyLive(sig);
+    if(live){
+      localStorage.removeItem(DKEY); localStorage.removeItem(PKEY);
+      awaitingSite = false;
+      say('<b>تم — الموقع يعرض تغييراتك الآن.</b> افتح المتجر للتأكد بنفسك.');
+    } else {
+      say('نُشرت التغييرات بنجاح، لكن الموقع لم يعرضها بعد (قد يحتاج دقيقة). بياناتك محفوظة ولن تضيع — اضغط «تحقّق مرة أخرى» بعد قليل.', 'note-warn');
+      $('#pubLog').insertAdjacentHTML('beforeend',
+        `<button class="btn btn-tonal" id="recheck">${icon('check')}<span>تحقّق مرة أخرى</span></button>`);
+      $('#recheck').onclick = async () => {
+        $('#recheck').disabled = true;
+        const ok = await verifyLive(localStorage.getItem(PKEY) || sig, 3);
+        if(ok){ localStorage.removeItem(DKEY); localStorage.removeItem(PKEY); awaitingSite = false;
+          toast('الموقع تحدّث بنجاح', 'ok'); location.reload(); }
+        else { toast('لم يتحدّث بعد — انتظر قليلاً وأعد المحاولة', 'err'); $('#recheck').disabled = false; }
+      };
+    }
   }catch(err){
     const msg = /Failed to fetch|NetworkError|Load failed/i.test(err.message)
       ? 'تعذّر الوصول إلى GitHub — تأكد من اتصالك بالإنترنت ثم أعد المحاولة.'
@@ -923,7 +965,7 @@ function renderStats(){
   $('#tabCCount').textContent = D.CATEGORIES.reduce((a, c) => a + c.subs.length, 0);
   $('#tabBCount').textContent = D.BRANDS.length;
 }
-function renderAll(){ renderStats(); renderProducts(); renderCats(); renderBrands(); renderSettings(); renderPublish(); }
+function renderAll(){ renderStats(); renderProducts(); renderCats(); renderBrands(); renderSettings(); renderPublish(); syncNotice(); }
 
 function showTab(id){
   $$('.tab').forEach(t => t.classList.toggle('on', t.dataset.tab === id));
@@ -1075,4 +1117,36 @@ async function testConnection(){
   }finally{
     const b = $('#ghTest'); if(b){ b.disabled = false; const l = b.querySelector('span'); if(l) l.textContent = old; }
   }
+}
+
+/* ============ التحقق من ظهور التغييرات على الموقع ============ */
+async function verifyLive(expectedCore, tries = 6){
+  for(let i = 0; i < tries; i++){
+    await new Promise(r => setTimeout(r, i === 0 ? 3500 : 6000));
+    try{
+      const r = await fetch('assets/js/data.js?ts=' + Date.now(), { cache:'no-store' });
+      if(!r.ok) continue;
+      if(bodyOf(await r.text()) === expectedCore) return true;
+    }catch(e){}
+  }
+  return false;
+}
+
+/* شريط تنبيه: نُشرت التغييرات والموقع لم يعرضها بعد */
+function syncNotice(){
+  const old = document.getElementById('awaitBar');
+  if(old) old.remove();
+  if(!awaitingSite) return;
+  const el = document.createElement('div');
+  el.id = 'awaitBar';
+  el.className = 'awaitbar';
+  el.innerHTML = `${icon('bolt')}<span>تغييراتك <b>منشورة ومحفوظة</b>، والموقع يُحدَّث خلال دقيقة. ما تراه هنا هو بياناتك الصحيحة.</span>
+    <button class="btn btn-sm" id="awaitCheck">تحقّق الآن</button>`;
+  document.getElementById('adm').prepend(el);
+  document.getElementById('awaitCheck').onclick = async e => {
+    const b = e.currentTarget; b.disabled = true; b.textContent = 'جارٍ الفحص…';
+    const ok = await verifyLive(localStorage.getItem(PKEY) || '', 2);
+    if(ok){ localStorage.removeItem(DKEY); localStorage.removeItem(PKEY); location.reload(); }
+    else { b.disabled = false; b.textContent = 'تحقّق الآن'; toast('لم يتحدّث بعد — أعد المحاولة بعد قليل', 'err'); }
+  };
 }

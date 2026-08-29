@@ -166,3 +166,9 @@ details summary::-webkit-details-marker{display:none}
   .sheet{padding:0;align-items:flex-end}
   .sheet-card{border-radius:var(--r-xl) var(--r-xl) 0 0;max-height:94vh}
 }
+
+.awaitbar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:#0B3B3B;color:#CFF3F3;
+  padding:11px 18px;font-size:13.5px;font-weight:700;position:sticky;top:0;z-index:70}
+.awaitbar .ic{width:18px;height:18px;color:var(--brand);flex:none}
+.awaitbar b{color:#fff}
+.awaitbar .btn{--bg-c:var(--brand);--fg-c:#04302F;margin-inline-start:auto}

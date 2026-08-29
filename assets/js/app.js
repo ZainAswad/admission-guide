@@ -596,17 +596,21 @@ function tileHTML(item, i){
 function initBento(){
   const box = document.getElementById('bento'); if(!box) return;
   const { prods, cats } = bentoPools();
-  const plan = [
-    { cls:'bt1', pool:prods, i:0 }, { cls:'bt2', pool:cats,  i:0 },
-    { cls:'bt3', pool:prods, i:1 }, { cls:'bt4', pool:prods, i:2 },
-    { cls:'bt5', pool:cats,  i:1 }, { cls:'bt6', pool:prods, i:3 },
-    { cls:'bt7', pool:cats,  i:2 }, { cls:'bt8', pool:prods, i:4 }
-  ];
+  /* البلاطات المخصّصة للمنتجات تتحوّل إلى أقسام إذا كانت المواد أقل من عددها،
+     حتى لا تتكرر المادة نفسها في أكثر من بلاطة. */
+  const slots = ['bt1','bt2','bt3','bt4','bt5','bt6','bt7','bt8'];
+  const wantsProduct = [true, false, true, true, false, true, false, true];
+  const maxProdTiles = Math.min(wantsProduct.filter(Boolean).length, prods.length);
+  let pi = 0, ci = 0;
+  const plan = slots.map((cls, n) => wantsProduct[n] && pi < maxProdTiles
+    ? { cls, pool:prods, i:pi++ }
+    : { cls, pool:cats, i:ci++ });
   box.innerHTML = plan.map((t, n) => `<div class="bt ${t.cls}">${tileHTML(t.pool[t.i % t.pool.length], n)}</div>`).join('');
   let k = 0;
   bentoTimer = setInterval(() => {
     if(document.hidden) return;
     const n = k++ % plan.length, t = plan[n];
+    if(t.pool.length < 2) return;          // لا تدوير لمجموعة من عنصر واحد
     t.i += plan.length;
     const cell = box.children[n]; if(!cell) return;
     cell.innerHTML = tileHTML(t.pool[t.i % t.pool.length], n + k);
