@@ -1,6 +1,6 @@
 /* =============================================================
    الوزني لتجارة الكهربائيات والإنارة الحديثة
-   ملف البيانات — وُلّد من لوحة التحكم بتاريخ ٢٩‏/٨‏/٢٠٢٦، ٨:٠٠:٢٨ م
+   ملف البيانات — وُلّد من لوحة التحكم بتاريخ ٢٩‏/٨‏/٢٠٢٦، ١١:٣٦:٠٨ م
    يمكن تعديله يدوياً أيضاً، أو من admin.html
    ============================================================= */
 
@@ -12,7 +12,6 @@ let SITE = {
   tagline: 'ضوء يصنع الفرق',
   about: 'الوزني لتجارة الكهربائيات والإنارة الحديثة — وجهتك الأولى في كربلاء لكل ما يخص الكهربائيات. نوفّر تشكيلة واسعة من أنظمة الإنارة الحديثة، الكيبلات والأسلاك بأنواعها، البوردات وأجهزة السيطرة ATS، العدد اليدوية ومواد التأسيس، وأجهزة الحماية والتحويل — بأسعار منافسة ومنتجات أصلية وضمان حقيقي.',
   currency: 'د.ع',
-  siteUrl: 'https://admission-guide-flame.vercel.app',   // رابط الموقع — يُستخدم في روابط المشاركة
   phones: [
     { label: 'المبيعات والاستفسار', number: '07734625041', intl: '9647734625041' }
   ],
@@ -124,27 +123,21 @@ let CATEGORIES = [
   }
 ];
 
-/* ---------- 3) العلامات التجارية ----------
-   logo اختياري: شعار العلامة، يُرفع من لوحة التحكم                        */
+/* ---------- 3) العلامات التجارية ---------- */
 let BRANDS = [
-  { name: 'Aswar', ar: 'أسوار' },
-  { name: 'OTG', ar: 'أو تي جي' },
-  { name: 'Siemens', ar: 'سيمنز' },
-  { name: 'Schneider', ar: 'شنايدر' },
-  { name: 'Philips', ar: 'فيليبس' },
-  { name: 'Camelion', ar: 'كامليون' },
-  { name: 'Hikvision', ar: 'هيك فيجن' },
-  { name: 'ABB', ar: 'إيه بي بي' },
-  { name: 'Legrand', ar: 'لوجراند' },
-  { name: 'Panasonic', ar: 'باناسونيك' },
-  { name: 'Duracell', ar: 'دوراسيل' },
-  { name: 'CamScan', ar: 'كام سكان' },
-  { name: 'GC', ar: 'جي سي' },
-  { name: 'Al-Fanar', ar: 'الفنار' },
-  { name: 'Aqaba', ar: 'العقبة' },
-  { name: 'Almustaqbal', ar: 'المستقبل السعودي' },
-  { name: 'Total', ar: 'توتال' },
-  { name: 'Ingco', ar: 'إنجكو' }
+  { name: 'Aswar', ar: 'أسوار', logo: 'assets/img/brands/aswar.png' },
+  { name: 'OTG', ar: 'أو تي جي', logo: 'assets/img/brands/otg.png' },
+  { name: 'Siemens', ar: 'سيمنز', logo: 'assets/img/brands/siemens.png' },
+  { name: 'Schneider', ar: 'شنايدر', logo: 'assets/img/brands/schneider.png' },
+  { name: 'Philips', ar: 'فيليبس', logo: 'assets/img/brands/philips.png' },
+  { name: 'Hikvision', ar: 'هيك فيجن', logo: 'assets/img/brands/hikvision.png' },
+  { name: 'ABB', ar: 'إيه بي بي', logo: 'assets/img/brands/abb.png' },
+  { name: 'Panasonic', ar: 'باناسونيك', logo: 'assets/img/brands/panasonic.png' },
+  { name: 'GC', ar: 'جي سي', logo: 'assets/img/brands/gc.png' },
+  { name: 'Al-Fanar', ar: 'الفنار', logo: 'assets/img/brands/fanar.png' },
+  { name: 'Aqaba', ar: 'العقبة', logo: 'assets/img/brands/aqaba.png' },
+  { name: 'Almustaqbal', ar: 'المستقبل السعودي', logo: 'assets/img/brands/mustaqbal.png' },
+  { name: 'Ingco', ar: 'إنجكو', logo: 'assets/img/brands/ingco.png' }
 ];
 
 /* ---------- 4) المنتجات ---------- */
