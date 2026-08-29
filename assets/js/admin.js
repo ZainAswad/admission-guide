@@ -1,4 +1,4 @@
-/* ============ لوحة تحكم متجر الوزني ============
+/* ============ لوحة تحكم المتجر ============
    تعمل بالكامل داخل المتصفح. تحفظ مسودّة محلياً، وتنشر إلى GitHub
    (فيُعاد نشر الموقع تلقائياً عبر Vercel) أو تصدّر الملفات يدوياً.        */
 
@@ -170,6 +170,14 @@ function initLock(){
 }
 function unlock(){ $('#lock').style.display = 'none'; $('#adm').style.display = 'block'; renderAll(); }
 
+/* اسم المتجر في عنوان الصفحة وترويسة اللوحة — يتبع الإعدادات تلقائياً */
+function applyBranding(){
+  const n = (D && D.SITE) ? D.SITE : SITE;
+  document.title = 'لوحة التحكم — ' + (n.shortName || n.name || 'المتجر');
+  const h = $('#admShopName'); if(h) h.textContent = n.name || '';
+  $$('[data-shop-logo]').forEach(img => img.alt = 'شعار ' + (n.shortName || n.name || ''));
+}
+
 /* ============ مولّد ملف data.js ============ */
 const ID_RE = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
 function q(s){ return "'" + String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\r?\n/g, '\\n') + "'"; }
@@ -189,7 +197,7 @@ function serializeData(d){
   const S = d.SITE;
   const L = [];
   L.push('/* =============================================================');
-  L.push('   الوزني لتجارة الكهربائيات والإنارة الحديثة');
+  L.push('   ' + (S.name || 'المتجر'));
   L.push('   ملف البيانات — وُلّد من لوحة التحكم بتاريخ ' + new Date().toLocaleString('ar-IQ'));
   L.push('   يمكن تعديله يدوياً أيضاً، أو من admin.html');
   L.push('   ============================================================= */');
@@ -1257,6 +1265,7 @@ function bind(){
 
 function boot(){
   loadState();
+  applyBranding();
   bind();
   initLock();
 }
@@ -1424,6 +1433,7 @@ function tokenLink(){
   const d = new Date();
   const stamp = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
               + `-${String(d.getHours()).padStart(2, '0')}${String(d.getMinutes()).padStart(2, '0')}`;
-  const note = `لوحة تحكم متجر الوزني ${stamp}`;
+  const shop = (D && D.SITE && D.SITE.shortName) || 'المتجر';
+  const note = `لوحة تحكم متجر ${shop} ${stamp}`;
   return 'https://github.com/settings/tokens/new?scopes=repo&description=' + encodeURIComponent(note);
 }
