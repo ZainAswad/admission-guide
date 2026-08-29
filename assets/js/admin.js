@@ -75,8 +75,29 @@ function loadState(){
   }
 }
 function writeDraft(){
-  try{ localStorage.setItem(DKEY, JSON.stringify(D)); return true; }
-  catch(e){ toast('تعذّر الحفظ محلياً — قد تكون مساحة المتصفح ممتلئة بسبب الصور.', 'err'); return false; }
+  try{
+    localStorage.setItem(DKEY, JSON.stringify(D));
+    document.getElementById('saveFail')?.remove();
+    return true;
+  }catch(e){
+    toast('تعذّر حفظ التغييرات على هذا الجهاز', 'err');
+    showSaveFailure();
+    return false;
+  }
+}
+/* إن فشل الحفظ المحلي فتغييراتك موجودة في الذاكرة فقط وتضيع عند إغلاق الصفحة */
+function showSaveFailure(){
+  if(document.getElementById('saveFail')) return;
+  const el = document.createElement('div');
+  el.id = 'saveFail'; el.className = 'awaitbar';
+  el.style.cssText = 'background:#5B1A1A;color:#FFD9D9';
+  el.innerHTML = `${icon('close')}<span style="flex:1"><b>تعذّر حفظ تغييراتك على هذا الجهاز</b> — قد تكون مساحة
+    المتصفح ممتلئة أو تستخدم نافذة تصفّح خاص. انشر الآن أو نزّل نسخة احتياطية، وإلا ضاعت عند إغلاق الصفحة.</span>
+    <button class="btn btn-sm" id="failBackup" style="--bg-c:#fff;--fg-c:#5B1A1A">نسخة احتياطية</button>`;
+  document.getElementById('adm').prepend(el);
+  document.getElementById('failBackup').onclick = () => download(
+    'wazani-backup-' + new Date().toISOString().slice(0, 10) + '.json',
+    new Blob([JSON.stringify(D, null, 2)], { type:'application/json' }));
 }
 function saveDraft(){ writeDraft(); awaitingSite = false; markDirty(true); }
 function discardDraft(){
@@ -842,14 +863,23 @@ async function coordsFromMapUrl(url){
 
 /* ============ تبويب النشر ============ */
 function renderPublish(){
-  const pend = D.PRODUCTS.filter(p => p.imgNew && p.imgData);
+  const pend = [...D.PRODUCTS.filter(p => p.imgNew && p.imgData),
+                ...D.BRANDS.filter(b => b.logoNew && b.logoData)];
   const tok = localStorage.getItem(TKEY) || '';
   const diff = countChanges();
+  const unsaved = diff.any;
   $('#pubBody').innerHTML = `
+    ${(!tok && unsaved) ? `<div class="note note-warn" style="align-items:center">
+      ${icon('shield')}<span style="flex:1"><b>عندك ${unsaved} تغيير غير منشور واللوحة غير موصولة.</b>
+      وصّلها من الأسفل لتنشر، أو نزّل نسخة احتياطية الآن حتى لا يضيع عملك إن أُغلق المتصفح.</span>
+      <button class="btn btn-sm" id="quickBackup" style="--bg-c:var(--warn);--fg-c:#3B2A00">${icon('box')}<span>نسخة احتياطية</span></button>
+    </div>` : ''}
     <div class="stat-row">
       <div class="stat"><b>${diff.added}</b><span>مادة مضافة</span></div>
       <div class="stat"><b>${diff.edited}</b><span>مادة معدّلة</span></div>
       <div class="stat"><b>${diff.removed}</b><span>مادة محذوفة</span></div>
+      <div class="stat"><b>${diff.brands}</b><span>تغيير بالعلامات</span></div>
+      <div class="stat"><b>${diff.cats}</b><span>تغيير بالأقسام</span></div>
       <div class="stat"><b>${pend.length}</b><span>صورة جديدة</span></div>
     </div>
 
@@ -895,9 +925,13 @@ function renderPublish(){
             <li><b>انسخ السطر</b> الذي يظهر لك (يبدأ بـ <code>ghp_</code>). يظهر مرة واحدة فقط.</li>
             <li><b>الصقه في الحقل أدناه</b> واضغط «توصيل».</li>
           </ol>
-          <a class="btn btn-lg" style="--bg-c:#1FAF54" target="_blank" rel="noopener"
-             href="https://github.com/settings/tokens/new?scopes=repo&description=%D9%84%D9%88%D8%AD%D8%A9%20%D8%AA%D8%AD%D9%83%D9%85%20%D9%85%D8%AA%D8%AC%D8%B1%20%D8%A7%D9%84%D9%88%D8%B2%D9%86%D9%8A">
+          <a class="btn btn-lg" style="--bg-c:#1FAF54" target="_blank" rel="noopener" href="${tokenLink()}">
             ${icon('shield')}<span>الخطوة 1 — فتح صفحة إنشاء المفتاح</span></a>
+          <div class="note note-info" style="margin-top:12px">${icon('bolt')}<span>
+            إن ظهرت رسالة <code>Note has already been taken</code> فمعناها أنك أنشأت مفتاحاً بهذا الاسم من قبل.
+            أضف أي حرف أو رقم إلى خانة <b>Note</b> في أعلى الصفحة واضغط Generate token مرة أخرى — أو
+            <a href="https://github.com/settings/tokens" target="_blank" rel="noopener" style="color:var(--brand-800);font-weight:900;text-decoration:underline">احذف المفتاح القديم من هنا</a>
+            ثم أعد المحاولة.</span></div>
           <div class="field" style="margin:18px 0 12px"><input id="ghTok" type="password" placeholder=" " dir="ltr" autocomplete="off"><label>الخطوة 2 — الصق المفتاح هنا</label></div>
           <input type="hidden" id="ghRepo" value="${esc(D.SITE.admin.repo)}">
           <input type="hidden" id="ghBranch" value="${esc(D.SITE.admin.branch)}">
@@ -936,10 +970,14 @@ function renderPublish(){
   const testBtn = $('#ghTest'); if(testBtn) testBtn.onclick = testConnection;
   const dg = $('#diagGo'); if(dg) dg.onclick = runDiagnostics;
   $('#dlData').onclick  = () => download('data.js', new Blob([exportData()], { type:'text/javascript;charset=utf-8' }));
-  $('#dlBackup').onclick = () => download('wazani-backup-' + new Date().toISOString().slice(0, 10) + '.json',
+  const doBackup = () => download('wazani-backup-' + new Date().toISOString().slice(0, 10) + '.json',
     new Blob([JSON.stringify(D, null, 2)], { type:'application/json' }));
-  const di = $('#dlImgs'); if(di) di.onclick = () => pend.forEach((p, i) =>
-    setTimeout(() => download(p.id + '.jpg', dataUrlToBlob(p.imgData)), i * 350));
+  $('#dlBackup').onclick = doBackup;
+  const qb = $('#quickBackup'); if(qb) qb.onclick = doBackup;
+  const di = $('#dlImgs'); if(di) di.onclick = () => pend.forEach((x, i) =>
+    setTimeout(() => x.imgData
+      ? download(x.id + '.jpg', dataUrlToBlob(x.imgData))
+      : download(slugFrom(x.name, []) + '.png', dataUrlToBlob(x.logoData)), i * 350));
   $('#upBackup').onchange = e => {
     const f = e.target.files[0]; if(!f) return;
     const fr = new FileReader();
@@ -953,13 +991,23 @@ function renderPublish(){
     fr.readAsText(f);
   };
 }
-function countChanges(){
-  const a = new Map(PUB.PRODUCTS.map(p => [p.id, JSON.stringify(p)]));
-  const b = new Map(D.PRODUCTS.map(p => { const c = clone(p); delete c.imgData; delete c.imgNew; return [p.id, JSON.stringify(c)]; }));
+/* يقارن قائمتين حسب مفتاح ويعيد عدد المضاف والمعدَّل والمحذوف */
+function diffList(oldArr, newArr, keyOf, cleanOf){
+  const a = new Map((oldArr || []).map(x => [keyOf(x), JSON.stringify(cleanOf ? cleanOf(x) : x)]));
+  const b = new Map((newArr || []).map(x => [keyOf(x), JSON.stringify(cleanOf ? cleanOf(x) : x)]));
   let added = 0, edited = 0, removed = 0;
   b.forEach((v, k) => { if(!a.has(k)) added++; else if(a.get(k) !== v) edited++; });
-  a.forEach((v, k) => { if(!b.has(k)) removed++; });
-  return { added, edited, removed };
+  a.forEach((_, k) => { if(!b.has(k)) removed++; });
+  return { added, edited, removed, total: added + edited + removed };
+}
+function countChanges(){
+  const p = diffList(PUB.PRODUCTS, D.PRODUCTS, x => x.id,
+    x => { const c = clone(x); delete c.imgData; delete c.imgNew; return c; });
+  const b = diffList(PUB.BRANDS, D.BRANDS, x => x.name,
+    x => { const c = clone(x); delete c.logoData; delete c.logoNew; return c; });
+  const c = diffList(PUB.CATEGORIES, D.CATEGORIES, x => x.id);
+  const settings = JSON.stringify(PUB.SITE) !== JSON.stringify(D.SITE) ? 1 : 0;
+  return { ...p, brands:b.total, cats:c.total, settings, any: p.total + b.total + c.total + settings };
 }
 function download(name, blob){
   const u = URL.createObjectURL(blob);
@@ -1368,4 +1416,14 @@ async function copyText(t){
     try{ document.execCommand('copy'); toast('نُسخت النتيجة', 'ok'); }catch(_){ toast('تعذّر النسخ', 'err'); }
     ta.remove();
   }
+}
+
+/* رابط إنشاء مفتاح GitHub — الاسم يجب أن يكون فريداً وإلا رفضه GitHub
+   برسالة "Note has already been taken" */
+function tokenLink(){
+  const d = new Date();
+  const stamp = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+              + `-${String(d.getHours()).padStart(2, '0')}${String(d.getMinutes()).padStart(2, '0')}`;
+  const note = `لوحة تحكم متجر الوزني ${stamp}`;
+  return 'https://github.com/settings/tokens/new?scopes=repo&description=' + encodeURIComponent(note);
 }
