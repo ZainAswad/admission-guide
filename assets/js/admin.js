@@ -216,6 +216,13 @@ function serializeData(d){
   L.push('  social: [');
   L.push(S.social.map(s => `    { id: ${q(s.id)}, name: ${q(s.name)}, url: ${q(s.url || '')} }`).join(',\n'));
   L.push('  ],');
+  const FBC = S.firebase || {};
+  L.push('  // نظام الطلبات (Firebase) — راجع FIREBASE.md');
+  L.push('  firebase: {');
+  L.push(`    apiKey: ${q(FBC.apiKey || '')},`);
+  L.push(`    projectId: ${q(FBC.projectId || '')},`);
+  L.push(`    adminEmail: ${q(FBC.adminEmail || '')}`);
+  L.push('  },');
   const AD = S.admin || {};
   L.push('  // إعدادات لوحة التحكم (admin.html) — غيّر كلمة السر من داخل اللوحة نفسها');
   L.push('  admin: {');
@@ -788,6 +795,15 @@ function renderSettings(){
         <div class="field"><input id="oHook" placeholder=" " value="${esc(S.orders.webhook || '')}" dir="ltr"><label>رابط حفظ الطلبات الخارجي (اختياري)</label></div>
       </div>
 
+      <h3 style="font-size:16px;margin-top:10px">نظام الطلبات (Firebase)</h3>
+      <div class="note note-info">${icon('bolt')}<span>يجعل الطلبات تصل داخل اللوحة بدل واتساب، وتتحكم بقبولها ورفضها.
+        اتبع دليل <code>FIREBASE.md</code> في المستودع للحصول على هذه القيم. إن تركتها فارغة يعمل المتجر بواتساب كما كان.</span></div>
+      <div class="f2">
+        <div class="field"><input id="fbKey" placeholder=" " value="${esc((S.firebase || {}).apiKey || '')}" dir="ltr"><label>Web API Key</label></div>
+        <div class="field"><input id="fbProj" placeholder=" " value="${esc((S.firebase || {}).projectId || '')}" dir="ltr"><label>Project ID</label></div>
+      </div>
+      <div class="field"><input id="fbAdmin" placeholder=" " value="${esc((S.firebase || {}).adminEmail || '')}" dir="ltr"><label>بريد حساب المدير</label></div>
+
       <h3 style="font-size:16px;margin-top:10px">كلمة سر لوحة التحكم</h3>
       <div class="f2">
         <div class="field"><input id="pw1" type="password" placeholder=" " autocomplete="new-password"><label>كلمة سر جديدة</label></div>
@@ -842,7 +858,11 @@ function renderSettings(){
     S.orders.deliveryFeeOutCity = +String($('#oOut').value).replace(/\D/g, '') || 0;
     S.orders.freeDeliveryOver   = +String($('#oFree').value).replace(/\D/g, '') || 0;
     S.orders.webhook = $('#oHook').value.trim();
-    saveDraft(); renderSettings(); renderStats();
+    S.firebase = S.firebase || {};
+    S.firebase.apiKey    = $('#fbKey').value.trim();
+    S.firebase.projectId = $('#fbProj').value.trim();
+    S.firebase.adminEmail= $('#fbAdmin').value.trim();
+    saveDraft(); renderSettings(); renderStats(); renderOrders();
     toast('حُفظت الإعدادات في المسودّة', 'ok');
   };
 }
@@ -1151,12 +1171,15 @@ function renderStats(){
   $('#tabCCount').textContent = D.CATEGORIES.reduce((a, c) => a + c.subs.length, 0);
   $('#tabBCount').textContent = D.BRANDS.length;
 }
-function renderAll(){ renderStats(); renderProducts(); renderCats(); renderBrands(); renderSettings(); renderPublish(); syncNotice(); }
+function renderAll(){ renderStats(); renderProducts(); renderCats(); renderBrands(); renderSettings(); renderPublish(); renderOrders(); syncNotice(); }
 
 function showTab(id){
   $$('.tab').forEach(t => t.classList.toggle('on', t.dataset.tab === id));
   $$('.pane').forEach(p => p.classList.toggle('on', p.id === 'pane-' + id));
   if(id === 'publish') renderPublish();
+  if(id === 'orders'){ renderOrders(); loadOrders(); }
+  clearInterval(ordTimer);
+  if(id === 'orders' && FB.ready()) ordTimer = setInterval(() => { if(!document.hidden) loadOrders(); }, 30000);
   window.scrollTo({ top:0 });
 }
 
@@ -1165,6 +1188,10 @@ function bind(){
   document.addEventListener('click', async e => {
     const t = e.target;
     const tab = t.closest('.tab'); if(tab) return showTab(tab.dataset.tab);
+    const of_ = t.closest('[data-ordf]'); if(of_){ ordFilter = of_.dataset.ordf; return renderOrders(); }
+    const ov = t.closest('[data-oview]'); if(ov) return orderSheet(ov.dataset.oview);
+    const os = t.closest('[data-ost]');
+    if(os){ const [id, st] = os.dataset.ost.split('|'); os.disabled = true; return setOrderStatus(id, st); }
     if(t.closest('[data-x]') || t.closest('.sheet-bg')) return closeSheet();
 
     if(t.closest('#addProduct')) return productSheet(null);
@@ -1266,6 +1293,8 @@ function bind(){
 function boot(){
   loadState();
   applyBranding();
+  FB.loadSession();
+  if(FB.ready() && FB.signedIn()) loadOrders();
   bind();
   initLock();
 }
@@ -1436,4 +1465,185 @@ function tokenLink(){
   const shop = (D && D.SITE && D.SITE.shortName) || 'المتجر';
   const note = `لوحة تحكم متجر ${shop} ${stamp}`;
   return 'https://github.com/settings/tokens/new?scopes=repo&description=' + encodeURIComponent(note);
+}
+
+/* ================= تبويب الطلبات ================= */
+let ORDERS = [], ordFilter = 'all', ordQuery = '', ordTimer = null;
+
+function renderOrders(){
+  const box = $('#ordBody'); if(!box) return;
+
+  if(!FB.ready()){
+    box.innerHTML = `<div class="note note-warn">${icon('bolt')}<span>
+      <b>نظام الطلبات غير مفعّل بعد.</b> املأ إعدادات Firebase في تبويب «إعدادات المحل»
+      واتبع دليل <code>FIREBASE.md</code> في المستودع. حتى ذلك الحين تصلك الطلبات عبر واتساب كما كانت.</span></div>`;
+    return;
+  }
+  if(!FB.signedIn()){
+    box.innerHTML = `<div class="panel"><div class="panel-b">
+      <h3 style="font-size:17px;margin-bottom:6px">دخول إدارة الطلبات</h3>
+      <p style="color:var(--grey);font-size:13.5px;margin-bottom:16px">
+        سجّل دخولك بحساب المدير الذي أنشأته في Firebase. يبقى الدخول محفوظاً على هذا الجهاز.</p>
+      <div class="f2" style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+        <div class="field"><input id="fbEmail" placeholder=" " dir="ltr" autocomplete="username"><label>البريد الإلكتروني</label></div>
+        <div class="field"><input id="fbPass" type="password" placeholder=" " autocomplete="current-password"><label>كلمة السر</label></div>
+      </div>
+      <button class="btn btn-lg" id="fbLogin" style="margin-top:6px">${icon('shield')}<span>دخول</span></button>
+      <div id="fbLoginMsg" style="margin-top:12px"></div>
+    </div></div>`;
+    $('#fbLogin').onclick = doFbLogin;
+    $('#fbPass').onkeydown = e => { if(e.key === 'Enter') doFbLogin(); };
+    return;
+  }
+
+  const counts = { all:ORDERS.length };
+  Object.keys(ORDER_STATUS).forEach(k => counts[k] = ORDERS.filter(o => o.status === k).length);
+  const rows = ORDERS.filter(o => (ordFilter === 'all' || o.status === ordFilter))
+    .filter(o => !ordQuery || norm([o.no, o.customer?.name, o.customer?.phone, o.customer?.gov].join(' ')).includes(norm(ordQuery)));
+
+  box.innerHTML = `
+    <div class="adm-tools">
+      <input type="text" id="ordQ" placeholder="ابحث برقم الطلب أو اسم الزبون أو هاتفه…" value="${esc(ordQuery)}">
+      <button class="btn btn-sm btn-tonal" id="ordRefresh">${icon('bolt')}<span>تحديث</span></button>
+      <button class="btn btn-sm btn-ghost" id="fbLogout">خروج (${esc(FB.session.email || '')})</button>
+    </div>
+    <div class="chips" style="margin-bottom:14px">
+      <button class="chip ${ordFilter === 'all' ? 'on' : ''}" data-ordf="all">الكل <span class="n">${counts.all}</span></button>
+      ${Object.keys(ORDER_STATUS).map(k => `<button class="chip ${ordFilter === k ? 'on' : ''}" data-ordf="${k}">
+        ${ORDER_STATUS[k].ar} <span class="n">${counts[k]}</span></button>`).join('')}
+    </div>
+    ${rows.length ? `<div class="ordgrid">${rows.map(orderCard).join('')}</div>`
+      : `<div class="empty" style="padding:48px"><h3 style="font-size:18px">لا توجد طلبات ${ordFilter === 'all' ? 'بعد' : 'بهذه الحالة'}</h3>
+         <p style="color:var(--grey)">${ordFilter === 'all' ? 'ستظهر هنا فور إرسال أول زبون لطلبه.' : ''}</p></div>`}`;
+
+  $('#ordQ').oninput = e => { ordQuery = e.target.value; renderOrders(); };
+  $('#ordRefresh').onclick = () => loadOrders(true);
+  $('#fbLogout').onclick = () => { FB.signOut(); ORDERS = []; renderOrders(); toast('خرجت من إدارة الطلبات', 'ok'); };
+}
+
+function orderCard(o){
+  const i = statusInfo(o.status);
+  const when = o.at ? new Date(Number(o.at)).toLocaleString('ar-IQ') : '';
+  return `<div class="ordcard" data-ord="${esc(o.id)}">
+    <div class="ordhead">
+      <div><b dir="ltr">${esc(o.no || o.id)}</b><small>${esc(when)}</small></div>
+      <span class="stpill" style="color:${i.color};background:${i.bg}">${icon(i.icon)}<span>${i.ar}</span></span>
+    </div>
+    <div class="ordbody">
+      <div class="ordrow">${icon('user')}<span>${esc(o.customer?.name || '')}</span></div>
+      <div class="ordrow">${icon('phone')}<a href="tel:${esc(o.customer?.phone || '')}" dir="ltr">${esc(fmtPhone(o.customer?.phone || ''))}</a></div>
+      <div class="ordrow">${icon('location')}<span>${esc([o.customer?.gov, o.customer?.area, o.customer?.address].filter(Boolean).join(' — ') || '—')}</span></div>
+      <div class="ordrow">${icon('box')}<span>${(o.items || []).length} مادة · ${o.method === 'pickup' ? 'استلام من المحل' : 'توصيل'}</span></div>
+      ${o.customer?.note ? `<div class="ordrow">${icon('headset')}<span>${esc(o.customer.note)}</span></div>` : ''}
+      ${o.adminNote ? `<div class="ordnote">${icon('headset')}<span>${esc(o.adminNote)}</span></div>` : ''}
+    </div>
+    <div class="ordfoot">
+      <b class="ordtotal">${money(o.total)} <small>${SITE.currency}</small></b>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-inline-start:auto">
+        ${o.status === 'pending' ? `
+          <button class="btn btn-sm" data-ost="${esc(o.id)}|confirmed">${icon('check')}<span>قبول</span></button>
+          <button class="btn btn-sm btn-danger" data-ost="${esc(o.id)}|rejected">${icon('close')}<span>رفض</span></button>` : ''}
+        <button class="btn btn-sm btn-tonal" data-oview="${esc(o.id)}">التفاصيل</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+async function doFbLogin(){
+  const email = $('#fbEmail').value.trim(), pass = $('#fbPass').value;
+  const msg = $('#fbLoginMsg');
+  const say = (m, cls) => { msg.innerHTML = `<div class="note ${cls || 'note-warn'}" style="margin:0">${icon('close')}<span>${esc(m)}</span></div>`; };
+  if(!email || !pass){ say('أدخل البريد وكلمة السر.'); return; }
+  const b = $('#fbLogin'); b.disabled = true; b.querySelector('span').textContent = 'جارٍ الدخول…';
+  try{
+    await FB.signIn(email, pass);
+    await loadOrders(true);
+    toast('تم الدخول', 'ok');
+  }catch(e){
+    say(/Failed to fetch|NetworkError/i.test(e.message) ? 'تعذّر الاتصال بالإنترنت.' : e.message);
+    const bb = $('#fbLogin'); if(bb){ bb.disabled = false; bb.querySelector('span').textContent = 'دخول'; }
+  }
+}
+
+async function loadOrders(loud){
+  if(!FB.ready() || !FB.signedIn()) { renderOrders(); return; }
+  try{
+    ORDERS = await FB.listOrders();
+    renderOrders(); updateOrderBadge();
+    if(loud) toast(`تم جلب ${ORDERS.length} طلب`, 'ok');
+  }catch(e){
+    if(/الجلسة/.test(e.message)){ FB.signOut(); renderOrders(); toast('انتهت الجلسة — سجّل الدخول', 'err'); return; }
+    if(loud) toast(e.message, 'err');
+    const box = $('#ordBody');
+    if(box) box.innerHTML = `<div class="note note-warn">${icon('close')}<span>
+      <b>تعذّر جلب الطلبات.</b> ${esc(e.message)}</span></div>`;
+  }
+}
+function updateOrderBadge(){
+  const el = $('#tabOCount'); if(!el) return;
+  const n = ORDERS.filter(o => o.status === 'pending').length;
+  el.textContent = n; el.style.display = n ? '' : 'none';
+  el.classList.toggle('hot', n > 0);
+}
+
+/* تغيير حالة الطلب أو إضافة تعليق */
+async function setOrderStatus(id, status, note){
+  const patch = { status, updatedAt: Date.now() };
+  if(note !== undefined) patch.adminNote = note;
+  try{
+    await FB.updateOrder(id, patch);
+    const i = ORDERS.findIndex(o => o.id === id);
+    if(i > -1) ORDERS[i] = { ...ORDERS[i], ...patch };
+    renderOrders(); updateOrderBadge();
+    toast('حُدّث الطلب — يراه الزبون في صفحة طلبه', 'ok');
+  }catch(e){ toast(e.message, 'err'); }
+}
+
+function orderSheet(id){
+  const o = ORDERS.find(x => x.id === id); if(!o) return;
+  const i = statusInfo(o.status);
+  openSheet('الطلب ' + (o.no || o.id), `
+    <div class="form">
+      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+        <span class="stpill big" style="color:${i.color};background:${i.bg}">${icon(i.icon)}<span>${i.ar}</span></span>
+        <small style="color:var(--grey)">${o.at ? new Date(Number(o.at)).toLocaleString('ar-IQ') : ''}</small>
+      </div>
+      <div class="panel" style="box-shadow:none"><div class="panel-b">
+        <div class="sum"><span>الاسم</span><b>${esc(o.customer?.name || '')}</b></div>
+        <div class="sum"><span>الهاتف</span><b dir="ltr">${esc(fmtPhone(o.customer?.phone || ''))}</b></div>
+        <div class="sum"><span>العنوان</span><b style="text-align:end;max-width:60%">${esc([o.customer?.gov, o.customer?.area, o.customer?.address].filter(Boolean).join(' — ') || '—')}</b></div>
+        <div class="sum"><span>الاستلام</span><b>${o.method === 'pickup' ? 'استلام من المحل' : 'توصيل'}</b></div>
+        <div class="sum"><span>الدفع</span><b>${o.payment === 'transfer' ? 'تحويل / اتفاق مسبق' : 'عند الاستلام'}</b></div>
+        ${o.customer?.note ? `<div class="sum"><span>ملاحظات الزبون</span><b style="text-align:end;max-width:60%">${esc(o.customer.note)}</b></div>` : ''}
+      </div></div>
+      <div class="panel" style="box-shadow:none"><div class="panel-b">
+        ${(o.items || []).map(it => `<div class="sum"><span>${esc(it.name)} <small style="color:var(--grey-2)">× ${it.q}</small></span><b>${money(it.total)}</b></div>`).join('')}
+        <div class="sum"><span>المجموع الفرعي</span><b>${money(o.subtotal)}</b></div>
+        <div class="sum"><span>التوصيل</span><b>${o.fee ? money(o.fee) : 'مجاني'}</b></div>
+        <div class="sum total"><span>الإجمالي</span><b>${money(o.total)} ${SITE.currency}</b></div>
+      </div></div>
+      <div class="field"><textarea id="oNote" placeholder=" ">${esc(o.adminNote || '')}</textarea>
+        <label>تعليق للزبون (يظهر له في صفحة طلبه)</label></div>
+      <div>
+        <h4 style="font-size:14px;margin-bottom:8px">تغيير الحالة</h4>
+        <div class="chips">${Object.keys(ORDER_STATUS).map(k => `<button type="button" class="chip ${o.status === k ? 'on' : ''}" data-osel="${k}">${ORDER_STATUS[k].ar}</button>`).join('')}</div>
+      </div>
+    </div>`,
+    `<a class="btn btn-ghost wa" target="_blank" rel="noopener" style="margin-inline-end:auto"
+        href="https://wa.me/${String(o.customer?.phone || '').replace(/^0/, '964')}?text=${encodeURIComponent('بخصوص طلبك رقم ' + (o.no || o.id) + ' من ' + SITE.shortName)}">
+        ${icon('whatsapp')}<span>مراسلة الزبون</span></a>
+     <button class="btn btn-ghost" data-x>إغلاق</button>
+     <button class="btn" id="oSave">${icon('check')}<span>حفظ</span></button>`);
+
+  let picked = o.status;
+  $('#sheetBody').addEventListener('click', e => {
+    const c = e.target.closest('[data-osel]'); if(!c) return;
+    picked = c.dataset.osel;
+    $$('#sheetBody [data-osel]').forEach(x => x.classList.toggle('on', x === c));
+  });
+  $('#oSave').onclick = async () => {
+    const btn = $('#oSave'); btn.disabled = true;
+    await setOrderStatus(id, picked, $('#oNote').value.trim());
+    closeSheet();
+  };
 }

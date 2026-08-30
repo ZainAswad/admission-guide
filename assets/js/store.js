@@ -82,27 +82,45 @@ const store = {
     const s = String(d.getFullYear()).slice(2) + pad(d.getMonth() + 1) + pad(d.getDate());
     return `${SITE.orders.prefix}-${s}-${String(n).padStart(3, '0')}`;
   },
-  placeOrder(customer, method, payment){
+  buildOrder(customer, method, payment){
     const lines = this.lines;
     if(!lines.length) return null;
     const sub = this.subtotal;
     const fee = this.deliveryFee(method, customer.gov);
-    const order = {
-      id: this.nextOrderId(),
+    return {
+      no: this.nextOrderId(),          // رقم معروض للزبون
       at: Date.now(),
       status: 'pending',
       customer, method, payment,
       items: lines.map(l => ({ id:l.id, name:l.name, brand:l.brand, price:l.price, q:l.q, unit:l.unit || 'حبة', total:l.total })),
-      subtotal: sub, fee, total: sub + fee
+      subtotal: sub, fee, total: sub + fee,
+      adminNote: ''
     };
-    this.orders.unshift(order);
+  },
+  /* يُحفظ الطلب في قاعدة البيانات إن كانت مضبوطة، وإلا محلياً فقط */
+  async placeOrder(customer, method, payment){
+    const order = this.buildOrder(customer, method, payment);
+    if(!order) return null;
+    let saved = { ...order, id: order.no, online: false };
+    if(FB.ready()){
+      const res = await FB.createOrder(order);   // يرمي عند الفشل ليعرف الزبون
+      saved = { ...order, id: res.id, online: true };
+    }
+    this.orders.unshift(saved);
     if(this.orders.length > 60) this.orders.length = 60;
     this.cart = [];
     this.save();
-    sendWebhook(order);
-    return order;
+    sendWebhook(saved);
+    return saved;
   },
-  orderById(id){ return this.orders.find(o => o.id === id); }
+  orderById(id){ return this.orders.find(o => o.id === id || o.no === id); },
+  /* يحدّث نسخة الزبون المحلية بحالة الطلب القادمة من قاعدة البيانات */
+  syncOrder(id, live){
+    const i = this.orders.findIndex(o => o.id === id);
+    if(i < 0) return;
+    this.orders[i] = { ...this.orders[i], status:live.status, adminNote:live.adminNote || '', updatedAt:live.updatedAt };
+    this.save();
+  }
 };
 
 /* --- أدوات مساعدة --- */
@@ -113,7 +131,6 @@ function pad(n){ return String(n).padStart(2, '0'); }
 const PMAP = new Map(PRODUCTS.map(p => [p.id, p]));
 function byId(id){ return PMAP.get(id); }
 
-function fmtPhone(v){ const d=String(v).replace(/\D/g,''); return d.length===11 ? `${d.slice(0,4)} ${d.slice(4,7)} ${d.slice(7)}` : v; }
 function money(n){ return new Intl.NumberFormat('en-US').format(Math.round(n)); }
 function priceHTML(n){ return `${money(n)} <small>${SITE.currency}</small>`; }
 
@@ -169,7 +186,7 @@ function sendWebhook(order){
 function orderText(o){
   const L = [];
   L.push(`*طلب جديد — ${SITE.shortName}*`);
-  L.push(`رقم الطلب: ${o.id}`);
+  L.push(`رقم الطلب: ${o.no || o.id}`);
   L.push(`التاريخ: ${new Date(o.at).toLocaleString('ar-IQ')}`);
   L.push('');
   L.push('*الزبون*');

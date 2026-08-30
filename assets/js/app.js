@@ -432,22 +432,44 @@ function viewCheckout(){
   </div>`;
 }
 
+function statusPill(st, big){
+  const i = statusInfo(st);
+  return `<span class="stpill${big ? ' big' : ''}" style="color:${i.color};background:${i.bg}">${icon(i.icon)}<span>${i.ar}</span></span>`;
+}
+/* شريط مراحل الطلب */
+function statusTrack(st){
+  if(st === 'rejected') return '';
+  const steps = ['pending', 'confirmed', 'preparing', 'delivering', 'done'];
+  const at = Math.max(0, steps.indexOf(st));
+  return `<ol class="track">${steps.map((k, i) => `<li class="${i < at ? 'done' : i === at ? 'now' : ''}">
+      <span class="dot">${i <= at ? icon('check') : ''}</span><b>${statusInfo(k).ar}</b></li>`).join('')}</ol>`;
+}
+
 /* --- تأكيد الطلب --- */
 function viewOrder(id){
   const o = store.orderById(id); if(!o) return notFound();
   const txt = orderText(o);
+  const live = o.online !== false && FB.ready();
   return `<div class="wrap sec">
     <div class="panel" style="max-width:760px;margin-inline:auto">
       <div class="panel-b" style="text-align:center;padding:34px 26px;background:linear-gradient(150deg,var(--brand-50),#fff)">
         <span style="width:72px;height:72px;border-radius:50%;background:var(--brand);color:#fff;display:grid;place-items:center;margin:0 auto 16px;box-shadow:var(--e-brand)">${icon('check')}</span>
-        <h2 style="font-size:24px;margin-bottom:8px">تم تسجيل طلبك بنجاح</h2>
-        <p style="color:var(--grey);max-width:46ch;margin:0 auto 6px">احتفظ برقم الطلب أدناه، وأرسله لنا عبر واتساب ليصل إلى فريق المبيعات فوراً.</p>
+        <h2 style="font-size:24px;margin-bottom:8px">${live ? 'وصل طلبك إلينا' : 'تم تسجيل طلبك'}</h2>
+        <p style="color:var(--grey);max-width:50ch;margin:0 auto 6px">${live
+          ? 'طلبك الآن عند فريق المبيعات وسنراجعه ونتواصل معك. تابع حالته من هذه الصفحة في أي وقت.'
+          : 'احتفظ برقم الطلب أدناه، وأرسله لنا عبر واتساب ليصل إلى فريق المبيعات.'}</p>
         <div style="display:inline-flex;align-items:center;gap:10px;background:#fff;border:2px dashed var(--brand);
           border-radius:var(--r);padding:12px 22px;margin:16px 0;font-weight:900;font-size:20px;letter-spacing:1px;direction:ltr">
-          ${o.id}<button class="ibtn" data-copy="${o.id}" aria-label="نسخ رقم الطلب" style="width:34px;height:34px">${icon('copy')}</button></div>
-        <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:6px">
-          <a class="btn btn-lg wa" target="_blank" rel="noopener" href="${waLink(txt)}">${icon('whatsapp')}<span>إرسال الطلب عبر واتساب</span></a>
-          <button class="btn btn-lg btn-outline" data-copytext>${icon('copy')}<span>نسخ تفاصيل الطلب</span></button>
+          ${esc(o.no || o.id)}<button class="ibtn" data-copy="${esc(o.no || o.id)}" aria-label="نسخ رقم الطلب" style="width:34px;height:34px">${icon('copy')}</button></div>
+        <div id="liveStatus">${statusPill(o.status, true)}</div>
+        ${live ? `<div id="liveTrack">${statusTrack(o.status)}</div>` : ''}
+        <div id="liveNote"></div>
+        <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:12px">
+          ${live
+            ? `<button class="btn btn-lg btn-outline" data-refresh="${esc(o.id)}">${icon('bolt')}<span>تحديث الحالة</span></button>
+               <a class="btn btn-lg wa" target="_blank" rel="noopener" href="${waLink('استفسار عن الطلب رقم ' + (o.no || o.id))}">${icon('whatsapp')}<span>استفسار عن الطلب</span></a>`
+            : `<a class="btn btn-lg wa" target="_blank" rel="noopener" href="${waLink(txt)}">${icon('whatsapp')}<span>إرسال الطلب عبر واتساب</span></a>
+               <button class="btn btn-lg btn-outline" data-copytext>${icon('copy')}<span>نسخ تفاصيل الطلب</span></button>`}
         </div>
       </div>
       <div class="panel-b">
@@ -482,8 +504,9 @@ function viewOrders(){
       <h2>طلباتي</h2><p>سجل الطلبات محفوظ على هذا الجهاز.</p></div></div>
     ${os.length ? `<div class="panel">${os.map(o => `<div class="crow">
       <div class="thumb" style="background:var(--brand-100);color:var(--brand-800);font-weight:900">${icon('box')}</div>
-      <div class="info"><b dir="ltr" style="letter-spacing:.5px">${o.id}</b>
-        <small>${new Date(o.at).toLocaleString('ar-IQ')} · ${o.items.length} مادة · ${o.method === 'pickup' ? 'استلام من المحل' : 'توصيل'}</small></div>
+      <div class="info"><b dir="ltr" style="letter-spacing:.5px">${esc(o.no || o.id)}</b>
+        <small>${new Date(o.at).toLocaleString('ar-IQ')} · ${o.items.length} مادة · ${o.method === 'pickup' ? 'استلام من المحل' : 'توصيل'}</small>
+        <div style="margin-top:5px">${statusPill(o.status)}</div></div>
       <span class="line-total">${priceHTML(o.total)}</span>
       <a class="btn btn-sm btn-tonal" href="#/order/${o.id}">التفاصيل</a>
     </div>`).join('')}</div>`
@@ -579,6 +602,8 @@ function afterRender(s){
   $$('.field select').forEach(x => x.classList.add('filled'));
   if(!s[0]) initBento();
   if(s[0] === 'checkout') initCheckout();
+  if(s[0] === 'order') refreshOrderStatus(s[1]);
+  if(s[0] === 'orders') refreshMyOrders();
   closeDrawer();
 }
 
@@ -692,7 +717,7 @@ function initCheckout(){
   };
   f.addEventListener('change', upd); upd();
 
-  f.addEventListener('submit', e => {
+  f.addEventListener('submit', async e => {
     e.preventDefault();
     const method = f.querySelector('input[name=method]:checked').value;
     const pay = f.querySelector('input[name=pay]:checked').value;
@@ -704,10 +729,30 @@ function initCheckout(){
     mark($('#fPhone'), !phone);
     mark($('#fAddr'), method === 'delivery' && addr.length < 5);
     if(!ok){ toast('الرجاء إكمال الحقول المطلوبة', 'err'); f.querySelector('.field.err input')?.focus(); return; }
-    const order = store.placeOrder({
-      name, phone, gov:$('#fGov').value, area:$('#fArea').value.trim(), address:addr, note:$('#fNote').value.trim()
-    }, method, pay);
-    if(order) location.hash = '#/order/' + order.id;
+
+    const btn = f.querySelector('button[type=submit]');
+    const lbl = btn.querySelector('span'), old = lbl.textContent;
+    btn.disabled = true; lbl.textContent = 'جارٍ إرسال الطلب…';
+    $('#orderErr')?.remove();
+    try{
+      const order = await store.placeOrder({
+        name, phone, gov:$('#fGov').value, area:$('#fArea').value.trim(), address:addr, note:$('#fNote').value.trim()
+      }, method, pay);
+      if(order) location.hash = '#/order/' + order.id;
+    }catch(err){
+      btn.disabled = false; lbl.textContent = old;
+      const net = /Failed to fetch|NetworkError|Load failed/i.test(err.message);
+      f.insertAdjacentHTML('afterbegin', `<div class="note note-err" id="orderErr">${icon('close')}<span>
+        <b>لم نتمكن من إرسال طلبك.</b> ${esc(net ? 'تحقّق من اتصالك بالإنترنت وحاول مجدداً.' : err.message)}
+        <br>يمكنك إرسال الطلب عبر واتساب مباشرة من الزر أدناه ونحن نسجّله لك.</span></div>`);
+      $('#orderErr').scrollIntoView({ behavior:'smooth', block:'center' });
+      const o = store.buildOrder({ name, phone, gov:$('#fGov').value, area:$('#fArea').value.trim(),
+        address:addr, note:$('#fNote').value.trim() }, method, pay);
+      $('#orderErr').insertAdjacentHTML('beforeend',
+        `<a class="btn btn-sm wa" style="margin-inline-start:auto" target="_blank" rel="noopener"
+            href="${waLink(orderText(o))}">${icon('whatsapp')}<span>إرسال عبر واتساب</span></a>`);
+      toast('تعذّر إرسال الطلب', 'err');
+    }
   });
 }
 
@@ -749,6 +794,36 @@ function suggest(q){
     + `<a class="sg" href="#/search/${encodeURIComponent(q)}" data-sg style="justify-content:center;font-weight:800;color:var(--brand-700)">
         عرض كل النتائج (${searchProducts(q).length})</a>`;
   box.classList.add('open');
+}
+
+/* ================= متابعة حالة الطلب ================= */
+async function refreshOrderStatus(id){
+  const o = store.orderById(id);
+  if(!o || o.online === false || !FB.ready() || !$('#liveStatus')) return;
+  try{
+    const live = await FB.getOrder(o.id);
+    if(!live) return;
+    store.syncOrder(o.id, live);
+    $('#liveStatus').innerHTML = statusPill(live.status, true);
+    const tr = $('#liveTrack'); if(tr) tr.innerHTML = statusTrack(live.status);
+    const nb = $('#liveNote');
+    if(nb) nb.innerHTML = live.adminNote
+      ? `<div class="adminnote">${icon('headset')}<span><b>رسالة من المتجر:</b> ${esc(live.adminNote)}</span></div>` : '';
+  }catch(e){ /* الشبكة أو الصلاحيات — نبقي آخر حالة معروفة */ }
+}
+async function refreshMyOrders(){
+  if(!FB.ready()) return;
+  const online = store.orders.filter(o => o.online !== false).slice(0, 12);
+  let changed = false;
+  for(const o of online){
+    try{
+      const live = await FB.getOrder(o.id);
+      if(live && (live.status !== o.status || (live.adminNote || '') !== (o.adminNote || ''))){
+        store.syncOrder(o.id, live); changed = true;
+      }
+    }catch(e){}
+  }
+  if(changed && parseHash()[0] === 'orders') render();
 }
 
 /* ================= الأحداث العامة ================= */
@@ -810,6 +885,17 @@ function bindGlobal(){
     /* فلتر العلامة */
     const br = t.closest('[data-brand]');
     if(br){ flt.brand = br.dataset.brand; render(); return; }
+
+    /* تحديث حالة الطلب يدوياً */
+    const rf = t.closest('[data-refresh]');
+    if(rf){
+      const b = rf, l = b.querySelector('span'), o = l.textContent;
+      b.disabled = true; l.textContent = 'جارٍ التحديث…';
+      refreshOrderStatus(rf.dataset.refresh).finally(() => {
+        b.disabled = false; l.textContent = o; toast('حُدّثت الحالة', 'ok');
+      });
+      return;
+    }
 
     /* نسخ */
     const cp = t.closest('[data-copy]');

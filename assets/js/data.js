@@ -29,6 +29,10 @@ let SITE = {
     { id: 'tiktok', name: 'تيك توك', url: '' },
     { id: 'telegram', name: 'تيليكرام', url: '' }
   ],
+  // نظام الطلبات (Firebase) — املأه من لوحة التحكم ← إعدادات المحل.
+  // إن بقي فارغاً يعمل المتجر بآلية واتساب كما كان. راجع FIREBASE.md
+  firebase: { apiKey: '', projectId: '', adminEmail: '' },
+
   // إعدادات لوحة التحكم (admin.html) — غيّر كلمة السر من داخل اللوحة نفسها
   admin: {
     hash: '649aeff5dfcf940c4a0e190f008a91efb48833aa3617e03a94cbee74bbe9d616',
