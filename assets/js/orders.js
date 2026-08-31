@@ -43,6 +43,8 @@ const FB = {
       'NOT_FOUND': 'لم يُعثر على الطلب.',
       'UNAUTHENTICATED': 'انتهت الجلسة — سجّل الدخول من جديد.',
       'INVALID_ARGUMENT': 'بيانات غير مقبولة من الخادم.',
+      'INVALID_EMAIL': 'البريد الإلكتروني غير صحيح — تأكد من محتوى الحقل.',
+      'MISSING_EMAIL': 'أدخل البريد الإلكتروني.',
       'EMAIL_NOT_FOUND': 'البريد غير مسجّل.',
       'INVALID_PASSWORD': 'كلمة السر غير صحيحة.',
       'INVALID_LOGIN_CREDENTIALS': 'البريد أو كلمة السر غير صحيحة.',
