@@ -1,6 +1,6 @@
 /* =============================================================
    الوزني للكهربائيات والإنارة الحديثة
-   ملف البيانات — وُلّد من لوحة التحكم بتاريخ ٢‏/٩‏/٢٠٢٦، ١٠:٠٧:٢٧ ص
+   ملف البيانات — وُلّد من لوحة التحكم بتاريخ ٢‏/٩‏/٢٠٢٦، ١٠:٢٦:٣٤ ص
    يمكن تعديله يدوياً أيضاً، أو من admin.html
    ============================================================= */
 
@@ -149,10 +149,16 @@ let BRANDS = [
 
 /* ---------- 4) المنتجات ---------- */
 let PRODUCTS = [
-  { id: 'LT-101', name: 'مصباح ثريا 5W', brand: 'AkkoStar', price: 1500, icon: 'bulb', image: 'assets/img/products/LT-101.jpg',
-    cats: ['lighting/bulbs'], desc: 'مصباح ثريا 5 واط متغير (ابيض - شمسي - اوف وايت)',
-    specs: ['12 واط', 'نوع الانارة : شمسي - ابيض - اوف وايت'] },
   { id: 'AK130', name: 'ماطور بوستر AKKO STAR', brand: 'AKKOSTAR', price: 75000, icon: 'bulb', unit: 'قطعة', image: 'assets/img/products/AK130.jpg',
     cats: ['electrical/pumps'], desc: 'ماطور ماء مع بوستر حجم 3/4 بقدرة نصف حصان.',
-    specs: ['بوستر', 'حجم 3/4', 'ملف نحاس', 'القدرة : 0.37 كيلو واط  - 0.5HP'] }
+    specs: ['بوستر', 'حجم 3/4', 'ملف نحاس', 'القدرة : 0.37 كيلو واط  - 0.5HP'] },
+  { id: 'AK-02239', name: 'اولمبي AKKOSTAR', brand: 'AKKOSTAR', price: 3500, icon: 'bulb', unit: 'قطعة', image: 'assets/img/products/AK-02239.jpg',
+    cats: ['electrical/satellite'], desc: '',
+    specs: ['متعدد القنوات', 'واحد خط'] },
+  { id: 'EL-101', name: 'صحن 85 سم AKKOSTAR', brand: 'AKKOSTAR', price: 15000, icon: 'bulb', image: 'assets/img/products/EL-101.jpg',
+    cats: ['electrical/satellite'], desc: '',
+    specs: ['85 cm', 'نوع ثقيل', 'مقاوم للصدأ'] },
+  { id: 'EL-102', name: 'مروحية سقفية OTG', brand: 'OTG', price: 65000, icon: 'bulb', image: 'assets/img/products/EL-102.jpg',
+    cats: ['electrical/fans'], desc: '',
+    specs: ['ملف نحاس', 'سرعة عالية', 'ضمان سنة', 'بولبرن مزدوج', 'ريشة 61 سم'] }
 ];
