@@ -1,6 +1,6 @@
 /* =============================================================
    الوزني للكهربائيات والإنارة الحديثة
-   ملف البيانات — وُلّد من لوحة التحكم بتاريخ ٢‏/٩‏/٢٠٢٦، ١٠:٢٦:٣٤ ص
+   ملف البيانات — وُلّد من لوحة التحكم بتاريخ ٢‏/٩‏/٢٠٢٦، ١٠:٤٣:٤٠ ص
    يمكن تعديله يدوياً أيضاً، أو من admin.html
    ============================================================= */
 
@@ -124,7 +124,8 @@ let CATEGORIES = [
     { id: 'exhaust', name: 'المفرغات', icon: 'exhaust' },
     { id: 'fans', name: 'المراوح السقفية والجدارية والعمودية', icon: 'fan' },
     { id: 'pumps', name: 'ماطورات الماء والبوستر', icon: 'pump' },
-    { id: 'doorbell', name: 'الجرس المنزلي', icon: 'doorbell' }
+    { id: 'doorbell', name: 'الجرس المنزلي', icon: 'doorbell' },
+    { id: 'ajhzh-mnzlya', name: 'الاجهزه المنزلية', icon: 'panelLight' }
     ]
   }
 ];
@@ -144,7 +145,9 @@ let BRANDS = [
   { name: 'Aqaba', ar: 'العقبة', logo: 'assets/img/brands/aqaba.png' },
   { name: 'Almustaqbal', ar: 'المستقبل السعودي', logo: 'assets/img/brands/mustaqbal.png' },
   { name: 'Ingco', ar: 'إنجكو', logo: 'assets/img/brands/ingco.png' },
-  { name: 'CHINT', ar: 'جاينت', logo: 'assets/img/brands/chint.png' }
+  { name: 'CHINT', ar: 'جاينت', logo: 'assets/img/brands/chint.png' },
+  { name: 'AKKOSTAR', ar: 'اكوستار', logo: 'assets/img/brands/akkostar.png' },
+  { name: 'WeToke', ar: 'ويتوك', logo: 'assets/img/brands/wetoke.png' }
 ];
 
 /* ---------- 4) المنتجات ---------- */
@@ -160,5 +163,8 @@ let PRODUCTS = [
     specs: ['85 cm', 'نوع ثقيل', 'مقاوم للصدأ'] },
   { id: 'EL-102', name: 'مروحية سقفية OTG', brand: 'OTG', price: 65000, icon: 'bulb', image: 'assets/img/products/EL-102.jpg',
     cats: ['electrical/fans'], desc: '',
-    specs: ['ملف نحاس', 'سرعة عالية', 'ضمان سنة', 'بولبرن مزدوج', 'ريشة 61 سم'] }
+    specs: ['ملف نحاس', 'سرعة عالية', 'ضمان سنة', 'بولبرن مزدوج', 'ريشة 61 سم'] },
+  { id: 'EL-103', name: 'سشوار AKKOSTAR', brand: 'AKKOSTAR', price: 25000, icon: 'bulb', image: 'assets/img/products/EL-103.jpg',
+    cats: ['electrical/ajhzh-mnzlya'], desc: '',
+    specs: ['2200W'] }
 ];
