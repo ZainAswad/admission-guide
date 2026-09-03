@@ -7,7 +7,7 @@ const esc  = s => String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','
 
 /* ---------- صورة المنتج ----------
    ASSET_REV: يتغيّر عند الحاجة لتجاوز نسخ محفوظة قديمة في متصفحات الزوار.  */
-const ASSET_REV = '3';
+const ASSET_REV = '4';
 function assetUrl(u){
   if(!u || /^(https?:|data:|blob:)/.test(u) || u.includes('?')) return u;
   return u + '?v=' + ASSET_REV;
@@ -27,6 +27,9 @@ function imgFallback(el){
       const alt = cdnUrl(el.dataset.orig);
       if(alt){ el.dataset.tried = '1'; el.src = alt; return; }
     }
+    /* شريحة معرض تعذّرت: نحذف الشريحة كلها ونعيد بناء المؤشّرات */
+    const slide = el.closest('.gal-slide');
+    if(slide){ const g = slide.closest('.gal'); slide.remove(); initGal(g); return; }
     const fb = el.dataset.fb;                 // فارغ = احذف الصورة فقط بلا بديل
     if(fb) el.insertAdjacentHTML('afterend', art(fb));
     el.remove();
@@ -38,6 +41,93 @@ function media(p, cls){
     ? `<img${cls ? ` class="${cls}"` : ''} src="${src}" alt="${esc(p.name)}" loading="lazy" decoding="async"
         data-fb="${esc(p.icon || 'junction')}"${p.image ? ` data-orig="${esc(p.image)}"` : ''} onerror="imgFallback(this)">`
     : art(p.icon);
+}
+/* كل صور المادة بالترتيب: الرئيسية أولاً ثم الإضافية */
+function galleryList(p){
+  const out = [], seen = new Set();
+  [p.image, ...(p.images || [])].forEach(u => {
+    if(u && !seen.has(u)){ seen.add(u); out.push(u); }
+  });
+  return out;
+}
+/* مصدر العرض لصورة واحدة — imgData/imgsData تُستخدمان أثناء المعاينة من اللوحة فقط */
+function galSrc(p, path, i){
+  if(i === 0 && p.imgData) return p.imgData;
+  const d = p.imgsData || {};
+  return d[path] || assetUrl(path);
+}
+/* معرض صور المادة: تمرير أفقي بالسحب، مع مؤشّرات ومصغّرات وأزرار تنقّل */
+function gallery(p){
+  const list = galleryList(p);
+  if(list.length < 2) return media(p);
+  const slides = list.map((u, i) => `<div class="gal-slide">
+      <img src="${galSrc(p, u, i)}" alt="${esc(p.name)} — صورة ${i + 1} من ${list.length}"
+           loading="${i ? 'lazy' : 'eager'}" decoding="async"
+           data-fb="" data-orig="${esc(u)}" onerror="imgFallback(this)"></div>`).join('');
+  const thumbs = list.map((u, i) => `<button type="button" class="gal-th" data-gth="${i}"
+      aria-label="عرض الصورة ${i + 1}"><img src="${galSrc(p, u, i)}" alt="" loading="lazy"
+      data-fb="" data-orig="${esc(u)}" onerror="imgFallback(this)"></button>`).join('');
+  return `<div class="gal" data-gal>
+    <div class="gal-track" data-gtrack tabindex="0" role="group" aria-label="صور المادة">${slides}</div>
+    <button class="gal-nav gal-prev" type="button" data-gnav="-1" aria-label="الصورة السابقة">${icon('chevron')}</button>
+    <button class="gal-nav gal-next" type="button" data-gnav="1" aria-label="الصورة التالية">${icon('chevron')}</button>
+    <div class="gal-dots" data-gdots aria-hidden="true"></div>
+    <div class="gal-thumbs" data-gthumbs>${thumbs}</div>
+  </div>`;
+}
+/* تشغيل المعرض — يُستدعى بعد الرسم، وقابل لإعادة الاستدعاء إن سقطت شريحة */
+function initGal(root){
+  const gals = root ? [root].filter(Boolean) : $$('[data-gal]');
+  gals.forEach(g => {
+    const track  = g.querySelector('[data-gtrack]');
+    const dots   = g.querySelector('[data-gdots]');
+    const thumbs = g.querySelector('[data-gthumbs]');
+    if(!track) return;
+    const slides = [...track.querySelectorAll('.gal-slide')];
+
+    /* شريحة واحدة أو أقل: لا داعي لأدوات التنقّل */
+    g.classList.toggle('single', slides.length < 2);
+    if(dots) dots.innerHTML = slides.map((_, i) =>
+      `<button type="button" data-gdot="${i}" aria-label="الصورة ${i + 1}"></button>`).join('');
+    if(thumbs) [...thumbs.children].forEach((t, i) => { t.hidden = i >= slides.length; });
+    if(slides.length < 2) return;
+
+    const goTo = i => {
+      const s = slides[Math.max(0, Math.min(slides.length - 1, i))];
+      if(s) s.scrollIntoView({ behavior: reduceMotion() ? 'auto' : 'smooth', block:'nearest', inline:'center' });
+    };
+    const setActive = i => {
+      g.dataset.at = i;
+      if(dots) [...dots.children].forEach((d, k) => d.classList.toggle('on', k === i));
+      if(thumbs) [...thumbs.children].forEach((t, k) => t.classList.toggle('on', k === i));
+    };
+    setActive(0);
+
+    /* الشريحة الظاهرة هي المرجع — نتجنّب حساب scrollLeft لاختلافه بين المتصفحات في RTL */
+    if(g._io) g._io.disconnect();
+    g._io = new IntersectionObserver(es => {
+      es.forEach(e => { if(e.isIntersecting) setActive(slides.indexOf(e.target)); });
+    }, { root: track, threshold:.6 });
+    slides.forEach(s => g._io.observe(s));
+
+    g.onclick = e => {
+      const nav = e.target.closest('[data-gnav]');
+      if(nav){ goTo((+g.dataset.at || 0) + (+nav.dataset.gnav)); return; }
+      const dot = e.target.closest('[data-gdot]');
+      if(dot){ goTo(+dot.dataset.gdot); return; }
+      const th = e.target.closest('[data-gth]');
+      if(th) goTo(+th.dataset.gth);
+    };
+    track.onkeydown = e => {
+      if(e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+      e.preventDefault();
+      /* في RTL: السهم الأيسر يتقدّم */
+      goTo((+g.dataset.at || 0) + (e.key === 'ArrowLeft' ? 1 : -1));
+    };
+  });
+}
+function reduceMotion(){
+  return window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
 function subLabel(p){
   const s = subInfo(p.cats[0]);
@@ -273,7 +363,7 @@ function viewProduct(id){
   return `<div class="wrap sec">
     ${crumbs([{ t:'الرئيسية', h:'#/' }, ...(s ? [{ t:s.parent.name, h:'#/c/' + s.parent.id }, { t:s.name, h:`#/c/${s.parent.id}/${s.id}` }] : []), { t:p.name }])}
     <div class="panel"><div class="qv">
-      <div class="qv-media">${media(p)}</div>
+      <div class="qv-media">${gallery(p)}</div>
       <div class="qv-body">
         <span class="card-brand">${esc(p.brand)} · ${esc(p.id)}</span>
         <h3>${esc(p.name)}</h3>
@@ -602,6 +692,7 @@ function afterRender(s){
   $$('.field select').forEach(x => x.classList.add('filled'));
   if(!s[0]) initBento();
   if(s[0] === 'checkout') initCheckout();
+  if(s[0] === 'p') initGal();
   if(s[0] === 'order') refreshOrderStatus(s[1]);
   if(s[0] === 'orders') refreshMyOrders();
   closeDrawer();

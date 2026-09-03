@@ -35,6 +35,7 @@ function imgFallback(el){
 
 const DKEY = 'wz_draft_v1', TKEY = 'wz_gh_token', PKEY = 'wz_published_v1';
 const IMG_DIR = 'assets/img/products/';
+const MAX_EXTRA = 6;            // أقصى عدد صور إضافية للمادة الواحدة
 const BRAND_DIR = 'assets/img/brands/';
 const DATA_PATH = 'assets/js/data.js';
 
@@ -49,7 +50,7 @@ function markDirty(v = true){ dirty = v; document.body.classList.toggle('dirty',
 /* نص قياسي للمقارنة (بدون سطر التاريخ وبدون بيانات الصور المؤقتة) */
 function coreOf(d){
   const c = clone(d);
-  (c.PRODUCTS || []).forEach(p => { delete p.imgData; delete p.imgNew; });
+  (c.PRODUCTS || []).forEach(p => { delete p.imgData; delete p.imgNew; delete p.imgsData; });
   (c.BRANDS || []).forEach(b => { delete b.logoData; delete b.logoNew; });
   return bodyOf(serializeData(c));
 }
@@ -266,6 +267,7 @@ function serializeData(d){
     if(p.badge) tail.push(`badge: ${q(p.badge)}`);
     if(p.unit && p.unit !== 'حبة') tail.push(`unit: ${q(p.unit)}`);
     if(p.image) tail.push(`image: ${q(p.image)}`);
+    if((p.images || []).length) tail.push(`images: ${inlineArr(p.images)}`);
     let s = `  { ${head}, ${nums.join(', ')}, ${tail.join(', ')},\n`;
     s += `    cats: ${inlineArr(p.cats)}, desc: ${q(p.desc || '')},\n`;
     s += `    specs: ${inlineArr(p.specs || [])} }`;
@@ -277,7 +279,7 @@ function serializeData(d){
 }
 function exportData(){
   const d = clone(D);
-  d.PRODUCTS.forEach(p => { delete p.imgData; delete p.imgNew; });
+  d.PRODUCTS.forEach(p => { delete p.imgData; delete p.imgNew; delete p.imgsData; });
   d.BRANDS.forEach(b => { delete b.logoData; delete b.logoNew; });
   return serializeData(d);
 }
@@ -393,6 +395,9 @@ function productSheet(id){
   let cats = (p.cats || []).slice();
   let iconSel = p.icon || 'bulb';
   let imgData = p.imgData || '', imgPath = p.image || '', imgNew = false;
+  /* الصور الإضافية: مسارات بالترتيب + خريطة البيانات المعلّقة للرفع */
+  let extra = (p.images || []).slice();
+  let extraData = Object.assign({}, p.imgsData || {});
 
   openSheet(isNew ? 'إضافة مادة جديدة' : 'تعديل المادة', `
     <div class="form">
@@ -445,6 +450,14 @@ function productSheet(id){
         </div>
       </div>
 
+      <div><h4 style="font-size:14px;margin-bottom:8px">صور إضافية
+        <small style="color:var(--grey);font-weight:600">— يتصفّحها الزبون بالسحب في صفحة المادة</small></h4>
+        <div class="note note-info" style="margin-bottom:10px">${icon('bolt')}<span>الصورة الرئيسية أعلاه تظهر أولاً في المعرض وفي بطاقات المنتجات. أضف هنا لقطات من زوايا أو مقاسات أخرى — حتى ${MAX_EXTRA} صور.</span></div>
+        <div class="galedit" id="galList"></div>
+        <label class="btn btn-sm btn-tonal" id="galAddWrap">${icon('plus')}<span>إضافة صور</span>
+          <input type="file" id="galIn" accept="image/*" multiple hidden></label>
+      </div>
+
       <div><h4 style="font-size:14px;margin-bottom:8px">الرسمة التوضيحية <small style="color:var(--grey);font-weight:600">— تظهر إن لم توجد صورة</small></h4>
         <div class="iconpick" id="iconpick">${Object.keys(ART).map(k =>
           `<button type="button" data-ic="${k}" class="${k === iconSel ? 'on' : ''}">${art(k)}<i>${k}</i></button>`).join('')}</div>
@@ -487,6 +500,57 @@ function productSheet(id){
     $('#imgDel').style.display = 'none';
   };
 
+  /* ---- الصور الإضافية ---- */
+  const drawGal = () => {
+    $('#galList').innerHTML = extra.length ? extra.map((u, i) => `
+      <div class="galitem">
+        <img src="${esc(extraData[u] || assetUrl(u))}" alt="" data-fb="" data-orig="${esc(u)}" onerror="imgFallback(this)">
+        <span class="galnum">${i + 2}</span>
+        <div class="galtools">
+          <button type="button" data-gmv="${i}" data-dir="-1" title="تقديم"${i === 0 ? ' disabled' : ''}>${icon('chevron')}</button>
+          <button type="button" data-gmv="${i}" data-dir="1" title="تأخير"${i === extra.length - 1 ? ' disabled' : ''}>${icon('chevron')}</button>
+          <button type="button" data-gdel="${i}" title="حذف">${icon('trash')}</button>
+        </div>
+      </div>`).join('')
+      : '<small style="color:var(--grey-2);font-size:12px">لم تُضف صور إضافية بعد</small>';
+    $('#galAddWrap').style.display = extra.length >= MAX_EXTRA ? 'none' : '';
+  };
+  drawGal();
+
+  $('#galList').onclick = e => {
+    const mv = e.target.closest('[data-gmv]');
+    if(mv){
+      const i = +mv.dataset.gmv, j = i + (+mv.dataset.dir);
+      if(j < 0 || j >= extra.length) return;
+      [extra[i], extra[j]] = [extra[j], extra[i]];
+      drawGal(); return;
+    }
+    const del = e.target.closest('[data-gdel]');
+    if(del){
+      const [gone] = extra.splice(+del.dataset.gdel, 1);
+      delete extraData[gone];
+      drawGal();
+    }
+  };
+  $('#galIn').onchange = async e => {
+    const files = [...e.target.files].slice(0, MAX_EXTRA - extra.length);
+    e.target.value = '';
+    if(!files.length) return;
+    const pid = isNew ? (($('#fi').value.trim()) || 'NEW') : p.id;
+    for(const f of files){
+      try{
+        const data = await resizeImage(f, 900, .82);
+        /* مسار فريد لا يصطدم بصورة قائمة ولا بصورة حذفناها للتوّ */
+        let n = 2, path;
+        do { path = IMG_DIR + pid + '-' + n + '.jpg'; n++; }
+        while(extra.includes(path) && n < 40);
+        extra.push(path);
+        extraData[path] = data;
+      }catch(err){ toast('تعذّرت قراءة إحدى الصور', 'err'); }
+    }
+    drawGal();
+  };
+
   $('#pSave').onclick = () => {
     const name = $('#fn').value.trim(), brand = $('#fb').value.trim();
     const price = parseInt(String($('#fp').value).replace(/\D/g, ''), 10) || 0;
@@ -507,6 +571,24 @@ function productSheet(id){
     const unit = $('#fu').value.trim(); if(unit && unit !== 'حبة') rec.unit = unit;
     if(imgNew){ rec.imgData = imgData; rec.image = IMG_DIR + pid + '.jpg'; rec.imgNew = true; }
     else if(imgPath){ rec.image = imgPath; if(imgData) rec.imgData = imgData; if(p.imgNew) rec.imgNew = true; }
+
+    /* الصور الإضافية — نعيد ترقيم المسارات المعلّقة على رقم المادة النهائي */
+    if(extra.length){
+      const keep = new Set(extra.filter(u => !extraData[u]));   // مسارات منشورة تبقى كما هي
+      const pend = {}, paths = [];
+      let n = 2;
+      const freePath = () => {
+        let path;
+        do { path = IMG_DIR + pid + '-' + (n++) + '.jpg'; } while(keep.has(path) && n < 60);
+        return path;
+      };
+      extra.forEach(u => {
+        if(extraData[u]){ const np = freePath(); paths.push(np); pend[np] = extraData[u]; }
+        else paths.push(u);
+      });
+      rec.images = paths;
+      if(Object.keys(pend).length) rec.imgsData = pend;
+    }
 
     if(isNew) D.PRODUCTS.push(rec);
     else D.PRODUCTS[D.PRODUCTS.findIndex(x => x.id === p.id)] = rec;
@@ -891,8 +973,15 @@ async function coordsFromMapUrl(url){
 
 /* ============ تبويب النشر ============ */
 function renderPublish(){
-  const pend = [...D.PRODUCTS.filter(p => p.imgNew && p.imgData),
-                ...D.BRANDS.filter(b => b.logoNew && b.logoData)];
+  /* قائمة موحّدة للصور المعلّقة: اسم الملف + بياناته — تخدم العدّاد والتنزيل اليدوي */
+  const pend = [
+    ...D.PRODUCTS.filter(p => p.imgNew && p.imgData)
+        .map(p => ({ file: p.id + '.jpg', data: p.imgData })),
+    ...D.PRODUCTS.flatMap(p => Object.keys(p.imgsData || {})
+        .map(path => ({ file: path.split('/').pop(), data: p.imgsData[path] }))),
+    ...D.BRANDS.filter(b => b.logoNew && b.logoData)
+        .map(b => ({ file: slugFrom(b.name, []) + '.png', data: b.logoData }))
+  ];
   const tok = localStorage.getItem(TKEY) || '';
   const diff = countChanges();
   const unsaved = diff.any;
@@ -1003,9 +1092,7 @@ function renderPublish(){
   $('#dlBackup').onclick = doBackup;
   const qb = $('#quickBackup'); if(qb) qb.onclick = doBackup;
   const di = $('#dlImgs'); if(di) di.onclick = () => pend.forEach((x, i) =>
-    setTimeout(() => x.imgData
-      ? download(x.id + '.jpg', dataUrlToBlob(x.imgData))
-      : download(slugFrom(x.name, []) + '.png', dataUrlToBlob(x.logoData)), i * 350));
+    setTimeout(() => download(x.file, dataUrlToBlob(x.data)), i * 350));
   $('#upBackup').onchange = e => {
     const f = e.target.files[0]; if(!f) return;
     const fr = new FileReader();
@@ -1030,7 +1117,7 @@ function diffList(oldArr, newArr, keyOf, cleanOf){
 }
 function countChanges(){
   const p = diffList(PUB.PRODUCTS, D.PRODUCTS, x => x.id,
-    x => { const c = clone(x); delete c.imgData; delete c.imgNew; return c; });
+    x => { const c = clone(x); delete c.imgData; delete c.imgNew; delete c.imgsData; return c; });
   const b = diffList(PUB.BRANDS, D.BRANDS, x => x.name,
     x => { const c = clone(x); delete c.logoData; delete c.logoNew; return c; });
   const c = diffList(PUB.CATEGORIES, D.CATEGORIES, x => x.id);
@@ -1104,6 +1191,10 @@ async function publishToGitHub(){
       ...D.PRODUCTS.filter(p => p.imgNew && p.imgData).map(p => ({
         path: p.image || (IMG_DIR + p.id + '.jpg'), data: p.imgData, name: p.name,
         msg: `رفع صورة المادة ${p.id}`, done: pth => { p.image = pth; delete p.imgNew; } })),
+      ...D.PRODUCTS.flatMap(p => Object.keys(p.imgsData || {}).map((path, i) => ({
+        path, data: p.imgsData[path], name: `${p.name} — صورة ${i + 2}`,
+        msg: `رفع صورة إضافية للمادة ${p.id}`,
+        done: () => { delete p.imgsData[path]; if(!Object.keys(p.imgsData).length) delete p.imgsData; } }))),
       ...D.BRANDS.filter(b => b.logoNew && b.logoData).map(b => ({
         path: b.logo || (BRAND_DIR + slugFrom(b.name, []) + '.png'), data: b.logoData, name: 'شعار ' + b.name,
         msg: `رفع شعار ${b.name}`, done: pth => { b.logo = pth; delete b.logoNew; } }))
@@ -1119,7 +1210,7 @@ async function publishToGitHub(){
     say(`نُشر ملف البيانات بنجاح — <a href="${res.commit.html_url}" target="_blank" rel="noopener"><b>عرض التغيير على GitHub</b></a>`);
     say('سيُحدَّث الموقع تلقائياً خلال ثوانٍ عبر Vercel. حدّث صفحة المتجر للتأكد.');
 
-    D.PRODUCTS.forEach(p => { delete p.imgData; delete p.imgNew; });
+    D.PRODUCTS.forEach(p => { delete p.imgData; delete p.imgNew; delete p.imgsData; });
     D.BRANDS.forEach(b => { delete b.logoData; delete b.logoNew; });
     const sig = coreOf(D);
     localStorage.setItem(PKEY, sig);
