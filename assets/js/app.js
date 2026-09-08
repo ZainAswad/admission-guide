@@ -7,7 +7,7 @@ const esc  = s => String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','
 
 /* ---------- صورة المنتج ----------
    ASSET_REV: يتغيّر عند الحاجة لتجاوز نسخ محفوظة قديمة في متصفحات الزوار.  */
-const ASSET_REV = '4';
+const ASSET_REV = '5';
 function assetUrl(u){
   if(!u || /^(https?:|data:|blob:)/.test(u) || u.includes('?')) return u;
   return u + '?v=' + ASSET_REV;
@@ -42,12 +42,13 @@ function media(p, cls){
         data-fb="${esc(p.icon || 'junction')}"${p.image ? ` data-orig="${esc(p.image)}"` : ''} onerror="imgFallback(this)">`
     : art(p.icon);
 }
-/* كل صور المادة بالترتيب: الرئيسية أولاً ثم الإضافية */
+/* كل صور المادة بالترتيب: الرئيسية، فالإضافية، فصور الخيارات — بلا تكرار */
 function galleryList(p){
   const out = [], seen = new Set();
-  [p.image, ...(p.images || [])].forEach(u => {
-    if(u && !seen.has(u)){ seen.add(u); out.push(u); }
-  });
+  const push = u => { if(u && !seen.has(u)){ seen.add(u); out.push(u); } };
+  push(p.image);
+  (p.images || []).forEach(push);
+  (p.options || []).forEach(o => (o.values || []).forEach(v => push(v.image)));
   return out;
 }
 /* مصدر العرض لصورة واحدة — imgData/imgsData تُستخدمان أثناء المعاينة من اللوحة فقط */
@@ -129,6 +130,77 @@ function initGal(root){
 function reduceMotion(){
   return window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
+
+/* ================= خيارات المنتج =================
+   أسماء الخيارات حرّة من إدخال صاحب المحل. type طريقة عرض فقط. */
+function optionsHTML(p){
+  const opts = p.options || [];
+  if(!opts.length) return '';
+  const sel = defaultOpts(p);
+  return `<div class="opts" data-opts>${opts.map(o => {
+    const color = o.type === 'color';
+    return `<div class="opt" data-opt="${esc(o.id)}">
+      <div class="opt-h"><span class="opt-n">${esc(o.name)}</span>
+        <span class="opt-v" data-optv="${esc(o.id)}">${esc(sel[o.id] || '')}</span></div>
+      <div class="opt-vals${color ? ' sw' : ''}" role="group" aria-label="${esc(o.name)}">
+        ${(o.values || []).map(v => {
+          const on = sel[o.id] === v.label;
+          return color
+            ? `<button type="button" class="swatch${on ? ' on' : ''}" data-oid="${esc(o.id)}"
+                 data-oval="${esc(v.label)}" title="${esc(v.label)}" aria-label="${esc(v.label)}"
+                 aria-pressed="${on}"><i style="background:${esc(v.swatch || '#DDD')}"></i></button>`
+            : `<button type="button" class="opt-pill${on ? ' on' : ''}" data-oid="${esc(o.id)}"
+                 data-oval="${esc(v.label)}" aria-pressed="${on}">${esc(v.label)}</button>`;
+        }).join('')}
+      </div></div>`;
+  }).join('')}</div>`;
+}
+/* قراءة الاختيار الحالي من الصفحة */
+function readOpts(){
+  const box = $('[data-opts]'); if(!box) return {};
+  const o = {};
+  $$('.opt', box).forEach(el => {
+    const on = el.querySelector('[data-oval][aria-pressed="true"]');
+    if(on) o[el.dataset.opt] = on.dataset.oval;
+  });
+  return o;
+}
+/* اختيار قيمة: يحدّث السعر، وينقل المعرض إلى صورة الخيار إن وُجدت */
+function pickOpt(p, oid, label){
+  const box = $('[data-opts]'); if(!box) return;
+  const group = box.querySelector(`.opt[data-opt="${CSS.escape(oid)}"]`);
+  if(!group) return;
+  $$('[data-oval]', group).forEach(b => {
+    const on = b.dataset.oval === label;
+    b.classList.toggle('on', on);
+    b.setAttribute('aria-pressed', on ? 'true' : 'false');
+  });
+  const lab = group.querySelector('[data-optv]');
+  if(lab) lab.textContent = label;
+
+  const opts = readOpts();
+  const pr = $('#pPrice');
+  if(pr) pr.innerHTML = priceHTML(variantPrice(p, opts));
+
+  const v = optValue(p, oid, label);
+  if(v && v.image){
+    const i = galleryList(p).indexOf(v.image);
+    const g = $('[data-gal]');
+    if(g && i > -1){
+      const s = g.querySelectorAll('.gal-slide')[i];
+      if(s) s.scrollIntoView({ behavior: reduceMotion() ? 'auto' : 'smooth', block:'nearest', inline:'center' });
+    }
+  }
+}
+/* نقاط ألوان مصغّرة على بطاقة المنتج */
+function swatchDots(p){
+  const o = (p.options || []).find(x => x.type === 'color' && (x.values || []).length > 1);
+  if(!o) return '';
+  const vals = o.values, show = vals.slice(0, 5), more = vals.length - show.length;
+  return `<span class="cdots" aria-label="${esc(o.name)}: ${vals.length}">
+    ${show.map(v => `<i style="background:${esc(v.swatch || '#DDD')}"></i>`).join('')}
+    ${more > 0 ? `<b>+${more}</b>` : ''}</span>`;
+}
 function subLabel(p){
   const s = subInfo(p.cats[0]);
   return s ? s.name : '';
@@ -152,6 +224,7 @@ function card(p){
       <span class="card-brand">${esc(p.brand)}</span>
       <a class="card-name" href="#/p/${p.id}">${esc(p.name)}</a>
       <span class="card-cat">${esc(subLabel(p))}</span>
+      ${swatchDots(p)}
       <div class="price-row">
         <span class="price">${priceHTML(p.price)}</span>
         ${p.old ? `<span class="old">${money(p.old)}</span>` : ''}
@@ -368,12 +441,13 @@ function viewProduct(id){
         <span class="card-brand">${esc(p.brand)} · ${esc(p.id)}</span>
         <h3>${esc(p.name)}</h3>
         <div class="price-row">
-          <span class="price" style="font-size:26px">${priceHTML(p.price)}</span>
+          <span class="price" id="pPrice" style="font-size:26px">${priceHTML(variantPrice(p, defaultOpts(p)))}</span>
           ${p.old ? `<span class="old">${money(p.old)}</span><span class="off">وفّر ${off}%</span>` : ''}
           <span class="card-cat">/ ${esc(p.unit || 'حبة')}</span>
         </div>
         <p class="desc">${esc(p.desc)}</p>
         <ul class="specs">${(p.specs || []).map(x => `<li>${icon('check')}<span>${esc(x)}</span></li>`).join('')}</ul>
+        ${optionsHTML(p)}
         <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:18px">
           <div class="qty" data-qtybox><button data-step="-1" aria-label="إنقاص">${icon('minus')}</button>
             <span id="pq">1</span><button data-step="1" aria-label="زيادة">${icon('plus')}</button></div>
@@ -404,16 +478,17 @@ function viewCart(){
       <button class="btn btn-sm btn-danger" data-clear>${icon('trash')}<span>إفراغ السلة</span></button></div>
     <div class="cart-wrap">
       <div class="panel" id="cartList">
-        ${lines.map(l => `<div class="crow" data-line="${l.id}">
+        ${lines.map(l => `<div class="crow" data-line="${esc(l.key)}">
           <div class="thumb">${media(l)}</div>
           <div class="info">
             <a href="#/p/${l.id}"><b>${esc(l.name)}</b></a>
+            ${l.optsText ? `<small class="lopts">${esc(l.optsText)}</small>` : ''}
             <small>${esc(l.brand)} · ${priceHTML(l.price)} / ${esc(l.unit || 'حبة')}</small>
           </div>
-          <div class="qty"><button data-dec="${l.id}" aria-label="إنقاص">${icon('minus')}</button>
-            <span>${l.q}</span><button data-inc="${l.id}" aria-label="زيادة">${icon('plus')}</button></div>
+          <div class="qty"><button data-dec="${esc(l.key)}" aria-label="إنقاص">${icon('minus')}</button>
+            <span>${l.q}</span><button data-inc="${esc(l.key)}" aria-label="زيادة">${icon('plus')}</button></div>
           <span class="line-total">${priceHTML(l.total)}</span>
-          <button class="ibtn" data-del="${l.id}" aria-label="حذف">${icon('trash')}</button>
+          <button class="ibtn" data-del="${esc(l.key)}" aria-label="حذف">${icon('trash')}</button>
         </div>`).join('')}
       </div>
       <div class="panel">
@@ -564,7 +639,9 @@ function viewOrder(id){
       </div>
       <div class="panel-b">
         <h3 style="font-size:16px;margin-bottom:12px">تفاصيل الطلب</h3>
-        ${o.items.map(it => `<div class="sum"><span>${esc(it.name)} <small style="color:var(--grey-2)">× ${it.q}</small></span><b>${money(it.total)}</b></div>`).join('')}
+        ${o.items.map(it => `<div class="sum"><span>${esc(it.name)} <small style="color:var(--grey-2)">× ${it.q}</small>${
+          it.opts ? `<br><small style="color:var(--brand-700);font-weight:700">${esc(it.opts)}</small>` : ''
+        }</span><b>${money(it.total)}</b></div>`).join('')}
         <div class="sum"><span>المجموع الفرعي</span><b>${priceHTML(o.subtotal)}</b></div>
         <div class="sum"><span>التوصيل (${o.method === 'pickup' ? 'استلام من المحل' : esc(o.customer.gov)})</span>
           <b>${o.fee ? money(o.fee) : '<span class="free">مجاني</span>'}</b></div>
@@ -940,7 +1017,7 @@ function bindGlobal(){
     if(add){
       const useQty = add.hasAttribute('data-useqty');
       const q = useQty ? (parseInt($('#pq')?.textContent, 10) || 1) : 1;
-      store.add(add.dataset.add, q);
+      store.add(add.dataset.add, q, useQty ? readOpts() : undefined);
       return;
     }
     /* المفضلة */
@@ -955,6 +1032,14 @@ function bindGlobal(){
     const open = t.closest('[data-open]');
     if(open && !t.closest('[data-fav],[data-add]')){ openQuick(open.dataset.open); return; }
 
+    /* اختيار خيار في صفحة المنتج */
+    const ov = t.closest('[data-oval]');
+    if(ov){
+      const pid = location.hash.split('/')[2];
+      const prod = pid && byId(decodeURIComponent(pid));
+      if(prod) pickOpt(prod, ov.dataset.oid, ov.dataset.oval);
+      return;
+    }
     /* كمية صفحة المنتج */
     const step = t.closest('[data-step]');
     if(step){

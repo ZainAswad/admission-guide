@@ -17,13 +17,69 @@ let PREVIEW = false;
   }catch(e){}
 })();
 
+/* ================= خيارات المنتج =================
+   الخيارات حرّة يعرّفها صاحب المحل: لون، قياس، واطية، قدرة، أو أي اسم آخر.
+   type ليس نوعاً بل طريقة عرض فقط: color مربّعات لونية، وما عداه أزرار نصية. */
+
+/* أول قيمة من كل خيار — تُختار تلقائياً فلا يُمنع الزبون من الشراء */
+function defaultOpts(p){
+  const o = {};
+  (p.options || []).forEach(x => { if((x.values || [])[0]) o[x.id] = x.values[0].label; });
+  return o;
+}
+function optValue(p, oid, label){
+  const o = (p.options || []).find(x => x.id === oid);
+  return o ? (o.values || []).find(v => v.label === label) || null : null;
+}
+/* السعر الفعّال: آخر قيمة مختارة تحمل price هي التي تحدّده */
+function variantPrice(p, opts){
+  let price = p.price;
+  (p.options || []).forEach(o => {
+    const v = optValue(p, o.id, (opts || {})[o.id]);
+    if(v && typeof v.price === 'number' && v.price > 0) price = v.price;
+  });
+  return price;
+}
+/* صورة الخيار المختار إن وُجدت — آخر واحدة تفوز */
+function variantImage(p, opts){
+  let img = '';
+  (p.options || []).forEach(o => {
+    const v = optValue(p, o.id, (opts || {})[o.id]);
+    if(v && v.image) img = v.image;
+  });
+  return img;
+}
+/* نصّ مقروء يُعرض للزبون ويُرفق بالطلب */
+function optsText(p, opts){
+  return (p.options || []).map(o => {
+    const val = (opts || {})[o.id];
+    return val ? `${o.name}: ${val}` : '';
+  }).filter(Boolean).join(' · ');
+}
+/* مفتاح سطر السلة — نفس المادة بخيارين مختلفين تعني سطرين */
+function lineKey(id, opts){
+  const keys = Object.keys(opts || {}).sort();
+  return id + '::' + keys.map(k => k + '=' + opts[k]).join('&');
+}
+
 const store = {
-  cart: [],   // [{id, q}]
+  cart: [],   // [{id, q, opts}]
   fav:  [],   // [id]
   orders: [],
 
   load(){
-    this.cart   = read(KEY.cart, []).filter(l => l && byId(l.id));
+    /* توافق رجعي: السلال القديمة بصيغة {id,q} بلا opts تبقى صالحة */
+    const raw = read(KEY.cart, []).filter(l => l && byId(l.id));
+    const merged = [];
+    raw.forEach(l => {
+      const p = byId(l.id);
+      const opts = l.opts && Object.keys(l.opts).length ? l.opts : defaultOpts(p);
+      const k = lineKey(l.id, opts);
+      const hit = merged.find(x => lineKey(x.id, x.opts) === k);
+      if(hit) hit.q = Math.min(999, hit.q + (l.q | 0 || 1));
+      else merged.push({ id:l.id, q:Math.max(1, l.q | 0 || 1), opts });
+    });
+    this.cart   = merged;
     this.fav    = read(KEY.fav, []).filter(id => byId(id));
     this.orders = read(KEY.orders, []);
   },
@@ -33,25 +89,41 @@ const store = {
   },
 
   /* --- السلة --- */
-  add(id, q = 1){
+  add(id, q = 1, opts){
     const p = byId(id); if(!p) return;
-    const line = this.cart.find(l => l.id === id);
-    if(line) line.q = Math.min(999, line.q + q); else this.cart.push({ id, q });
+    const o = (opts && Object.keys(opts).length) ? opts : defaultOpts(p);
+    const k = lineKey(id, o);
+    const line = this.lineOf(k);
+    if(line) line.q = Math.min(999, line.q + q); else this.cart.push({ id, q, opts:o });
     this.save();
-    toast(`تمت إضافة «${p.name}» إلى السلة`, 'ok');
+    const txt = optsText(p, o);
+    toast(`تمت إضافة «${p.name}${txt ? ' — ' + txt : ''}» إلى السلة`, 'ok');
   },
-  setQty(id, q){
-    const line = this.cart.find(l => l.id === id); if(!line) return;
+  lineOf(key){ return this.cart.find(l => lineKey(l.id, l.opts) === key); },
+  setQty(key, q){
+    const line = this.lineOf(key); if(!line) return;
     line.q = Math.max(1, Math.min(999, q)); this.save();
   },
-  remove(id){
-    this.cart = this.cart.filter(l => l.id !== id); this.save();
+  remove(key){
+    this.cart = this.cart.filter(l => lineKey(l.id, l.opts) !== key); this.save();
   },
   clearCart(){ this.cart = []; this.save(); },
-  qtyOf(id){ const l = this.cart.find(l => l.id === id); return l ? l.q : 0; },
+  qtyOf(key){ const l = this.lineOf(key); return l ? l.q : 0; },
   get count(){ return this.cart.reduce((n, l) => n + l.q, 0); },
   get lines(){
-    return this.cart.map(l => { const p = byId(l.id); return p ? { ...p, q:l.q, total:p.price * l.q } : null; }).filter(Boolean);
+    return this.cart.map(l => {
+      const p = byId(l.id); if(!p) return null;
+      const opts  = l.opts || {};
+      const price = variantPrice(p, opts);
+      const vimg  = variantImage(p, opts);
+      const line  = { ...p, q:l.q, opts, key:lineKey(l.id, opts),
+                      price, optsText: optsText(p, opts), total: price * l.q };
+      /* صورة الخيار تحلّ محل الرئيسية في السلة، مع بياناتها إن كانت غير منشورة */
+      if(vimg){ line.image = vimg; line.imgData = (p.imgsData || {})[vimg] || ''; }
+      /* السعر القديم لا معنى له إن غيّر الخيار السعر */
+      if(price !== p.price) line.old = 0;
+      return line;
+    }).filter(Boolean);
   },
   get subtotal(){ return this.lines.reduce((s, l) => s + l.total, 0); },
   get savings(){
@@ -92,7 +164,8 @@ const store = {
       at: Date.now(),
       status: 'pending',
       customer, method, payment,
-      items: lines.map(l => ({ id:l.id, name:l.name, brand:l.brand, price:l.price, q:l.q, unit:l.unit || 'حبة', total:l.total })),
+      items: lines.map(l => ({ id:l.id, name:l.name, brand:l.brand, price:l.price, q:l.q,
+                               unit:l.unit || 'حبة', total:l.total, opts:l.optsText || '' })),
       subtotal: sub, fee, total: sub + fee,
       adminNote: ''
     };
@@ -198,7 +271,10 @@ function orderText(o){
   L.push(`الاستلام: ${o.method === 'pickup' ? 'استلام من المحل' : 'توصيل إلى العنوان'}`);
   L.push('');
   L.push('*المواد*');
-  o.items.forEach((it, i) => L.push(`${i + 1}. ${it.name} — ${it.q} ${it.unit} × ${money(it.price)} = ${money(it.total)} ${SITE.currency}`));
+  o.items.forEach((it, i) => {
+    L.push(`${i + 1}. ${it.name} — ${it.q} ${it.unit} × ${money(it.price)} = ${money(it.total)} ${SITE.currency}`);
+    if(it.opts) L.push(`    (${it.opts})`);
+  });
   L.push('');
   L.push(`المجموع: ${money(o.subtotal)} ${SITE.currency}`);
   L.push(`التوصيل: ${o.fee ? money(o.fee) + ' ' + SITE.currency : 'مجاناً'}`);

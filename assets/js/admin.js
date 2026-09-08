@@ -35,7 +35,8 @@ function imgFallback(el){
 
 const DKEY = 'wz_draft_v1', TKEY = 'wz_gh_token', PKEY = 'wz_published_v1';
 const IMG_DIR = 'assets/img/products/';
-const MAX_EXTRA = 6;            // أقصى عدد صور إضافية للمادة الواحدة
+const MAX_EXTRA = 6;
+const DEF_SWATCH = '#cccccc';            // أقصى عدد صور إضافية للمادة الواحدة
 const BRAND_DIR = 'assets/img/brands/';
 const DATA_PATH = 'assets/js/data.js';
 
@@ -270,7 +271,21 @@ function serializeData(d){
     if((p.images || []).length) tail.push(`images: ${inlineArr(p.images)}`);
     let s = `  { ${head}, ${nums.join(', ')}, ${tail.join(', ')},\n`;
     s += `    cats: ${inlineArr(p.cats)}, desc: ${q(p.desc || '')},\n`;
-    s += `    specs: ${inlineArr(p.specs || [])} }`;
+    s += `    specs: ${inlineArr(p.specs || [])}`;
+    if((p.options || []).length){
+      const os = p.options.map(o => {
+        const vs = o.values.map(v => {
+          const f = [`label: ${q(v.label)}`];
+          if(v.swatch) f.push(`swatch: ${q(v.swatch)}`);
+          if(v.image)  f.push(`image: ${q(v.image)}`);
+          if(v.price)  f.push(`price: ${+v.price}`);
+          return `        { ${f.join(', ')} }`;
+        }).join(',\n');
+        return `      { id: ${q(o.id)}, name: ${q(o.name)}, type: ${q(o.type || 'text')},\n        values: [\n${vs}\n      ] }`;
+      }).join(',\n');
+      s += `,\n    options: [\n${os}\n    ]`;
+    }
+    s += ` }`;
     return s;
   }).join(',\n'));
   L.push('];');
@@ -398,6 +413,7 @@ function productSheet(id){
   /* الصور الإضافية: مسارات بالترتيب + خريطة البيانات المعلّقة للرفع */
   let extra = (p.images || []).slice();
   let extraData = Object.assign({}, p.imgsData || {});
+  let options = clone(p.options || []);
 
   openSheet(isNew ? 'إضافة مادة جديدة' : 'تعديل المادة', `
     <div class="form">
@@ -456,6 +472,16 @@ function productSheet(id){
         <div class="galedit" id="galList"></div>
         <label class="btn btn-sm btn-tonal" id="galAddWrap">${icon('plus')}<span>إضافة صور</span>
           <input type="file" id="galIn" accept="image/*" multiple hidden></label>
+      </div>
+
+      <div><h4 style="font-size:14px;margin-bottom:8px">الخيارات
+        <small style="color:var(--grey);font-weight:600">— لون، قياس، واطية، قدرة… أو أي خيار تسمّيه أنت</small></h4>
+        <div class="note note-info" style="margin-bottom:10px">${icon('bolt')}<span>
+          اسم الخيار حرّ تماماً. اختر <b>لون</b> لعرضه كمربّعات ملوّنة، أو <b>نصّي</b> لعرضه كأزرار.
+          صورة القيمة تظهر للزبون فور اختيارها. والسعر — إن تُرك فارغاً يبقى سعر المادة،
+          وإن وُضع في أكثر من خيار فآخر خيار يحمل سعراً هو الذي يُعتمد.</span></div>
+        <div id="optList"></div>
+        <button class="btn btn-sm btn-tonal" type="button" id="optAdd">${icon('plus')}<span>إضافة خيار</span></button>
       </div>
 
       <div><h4 style="font-size:14px;margin-bottom:8px">الرسمة التوضيحية <small style="color:var(--grey);font-weight:600">— تظهر إن لم توجد صورة</small></h4>
@@ -551,6 +577,133 @@ function productSheet(id){
     drawGal();
   };
 
+  /* ---- الخيارات ---- */
+  const optId = name => {
+    const taken = options.map(o => o.id);
+    return slugFrom(name || 'opt', taken);
+  };
+  const drawOpts = () => {
+    $('#optList').innerHTML = options.length ? options.map((o, i) => `
+      <div class="optcard" data-oi="${i}">
+        <div class="opthead">
+          <input class="optname" value="${esc(o.name || '')}" data-oname="${i}" placeholder="اسم الخيار — مثل: اللون">
+          <select data-otype="${i}">
+            <option value="text"${o.type !== 'color' ? ' selected' : ''}>نصّي</option>
+            <option value="color"${o.type === 'color' ? ' selected' : ''}>لون</option>
+          </select>
+          <button type="button" data-omv="${i}" data-dir="-1" title="تقديم"${i === 0 ? ' disabled' : ''}>${icon('chevron')}</button>
+          <button type="button" data-omv="${i}" data-dir="1" title="تأخير"${i === options.length - 1 ? ' disabled' : ''}>${icon('chevron')}</button>
+          <button type="button" data-oxdel="${i}" title="حذف الخيار">${icon('trash')}</button>
+        </div>
+        <div class="optvals">
+          ${(o.values || []).map((v, j) => `
+            <div class="optval">
+              ${o.type === 'color'
+                ? `<input type="color" value="${esc(v.swatch || '#cccccc')}" data-osw="${i}.${j}" title="اللون">`
+                : ''}
+              <input value="${esc(v.label || '')}" data-olab="${i}.${j}" placeholder="القيمة — مثل: أبيض">
+              <input value="${v.price ? v.price : ''}" data-opr="${i}.${j}" inputmode="numeric" placeholder="سعر خاص (اختياري)">
+              <label class="ovimg${v.image ? ' has' : ''}" title="${v.image ? 'تغيير الصورة' : 'إضافة صورة'}">
+                ${v.image ? `<img src="${esc(extraData[v.image] || assetUrl(v.image))}" alt="" data-fb="" onerror="imgFallback(this)">` : icon('box')}
+                <input type="file" accept="image/*" data-oimg="${i}.${j}" hidden>
+              </label>
+              ${v.image ? `<button type="button" data-oimgdel="${i}.${j}" title="إزالة الصورة">${icon('close')}</button>` : ''}
+              <button type="button" data-ovdel="${i}.${j}" title="حذف القيمة">${icon('trash')}</button>
+            </div>`).join('')}
+        </div>
+        <button class="btn btn-sm btn-ghost" type="button" data-ovadd="${i}">${icon('plus')}<span>إضافة قيمة</span></button>
+      </div>`).join('')
+      : '<small style="color:var(--grey-2);font-size:12px">لا خيارات — المادة تُباع بشكل واحد</small>';
+  };
+  drawOpts();
+
+  const at = k => { const [i, j] = k.split('.').map(Number); return { i, j, o:options[i], v:options[i].values[j] }; };
+
+  $('#optAdd').onclick = () => {
+    options.push({ id:optId('opt'), name:'', type:'text', values:[{ label:'' }] });
+    drawOpts();
+  };
+  $('#optList').oninput = e => {
+    const t = e.target;
+    if(t.dataset.oname !== undefined){
+      const o = options[+t.dataset.oname];
+      o.name = t.value;
+      /* المعرّف يُشتق من الاسم مرة واحدة ثم يثبت، فلا تنكسر سلال الزبائن */
+      if(!o._named && t.value.trim()){
+        o._named = true;
+        o.id = slugFrom(t.value, options.filter(x => x !== o).map(x => x.id));
+      }
+      return;
+    }
+    if(t.dataset.olab !== undefined){ at(t.dataset.olab).v.label = t.value; return; }
+    if(t.dataset.osw  !== undefined){ at(t.dataset.osw).v.swatch = t.value; return; }
+    if(t.dataset.opr  !== undefined){
+      const n = parseInt(String(t.value).replace(/\D/g, ''), 10) || 0;
+      const { v } = at(t.dataset.opr);
+      if(n > 0) v.price = n; else delete v.price;
+    }
+  };
+  $('#optList').onchange = async e => {
+    const t = e.target;
+    if(t.dataset.otype !== undefined){
+      const o = options[+t.dataset.otype];
+      o.type = t.value;
+      /* لون افتراضي لكل قيمة، وإلا ظهرت كل الألوان متطابقة عند الزبون */
+      if(o.type === 'color') (o.values || []).forEach(v => { if(!v.swatch) v.swatch = DEF_SWATCH; });
+      drawOpts(); return;
+    }
+    if(t.dataset.oimg !== undefined){
+      const f = t.files[0]; if(!f) return;
+      const { v } = at(t.dataset.oimg);
+      try{
+        const data = await resizeImage(f, 900, .82);
+        const pid = isNew ? (($('#fi').value.trim()) || 'NEW') : p.id;
+        let n = 1, path;
+        do { path = IMG_DIR + pid + '-o' + n + '.jpg'; n++; }
+        while((extraData[path] || optionPaths().includes(path)) && n < 60);
+        if(v.image) delete extraData[v.image];
+        v.image = path; extraData[path] = data;
+        drawOpts();
+      }catch(err){ toast('تعذّرت قراءة الصورة', 'err'); }
+    }
+  };
+  const optionPaths = () => options.flatMap(o => (o.values || []).map(v => v.image).filter(Boolean));
+  $('#optList').onclick = e => {
+    const t = e.target;
+    const del = t.closest('[data-oxdel]');
+    if(del){
+      const gone = options.splice(+del.dataset.oxdel, 1)[0];
+      (gone.values || []).forEach(v => { if(v.image) delete extraData[v.image]; });
+      drawOpts(); return;
+    }
+    const mv = t.closest('[data-omv]');
+    if(mv){
+      const i = +mv.dataset.omv, j = i + (+mv.dataset.dir);
+      if(j < 0 || j >= options.length) return;
+      [options[i], options[j]] = [options[j], options[i]];
+      drawOpts(); return;
+    }
+    const va = t.closest('[data-ovadd]');
+    if(va){
+      const o = options[+va.dataset.ovadd];
+      (o.values ||= []).push(o.type === 'color' ? { label:'', swatch:DEF_SWATCH } : { label:'' });
+      drawOpts(); return;
+    }
+    const vd = t.closest('[data-ovdel]');
+    if(vd){
+      const { o, j } = at(vd.dataset.ovdel);
+      const gone = o.values.splice(j, 1)[0];
+      if(gone.image) delete extraData[gone.image];
+      drawOpts(); return;
+    }
+    const id = t.closest('[data-oimgdel]');
+    if(id){
+      const { v } = at(id.dataset.oimgdel);
+      if(v.image) delete extraData[v.image];
+      delete v.image; drawOpts();
+    }
+  };
+
   $('#pSave').onclick = () => {
     const name = $('#fn').value.trim(), brand = $('#fb').value.trim();
     const price = parseInt(String($('#fp').value).replace(/\D/g, ''), 10) || 0;
@@ -572,6 +725,27 @@ function productSheet(id){
     if(imgNew){ rec.imgData = imgData; rec.image = IMG_DIR + pid + '.jpg'; rec.imgNew = true; }
     else if(imgPath){ rec.image = imgPath; if(imgData) rec.imgData = imgData; if(p.imgNew) rec.imgNew = true; }
 
+    /* الخيارات — نحذف الفارغة، ونعيد ترقيم صور القيم المعلّقة */
+    const cleanOpts = options
+      .map(o => ({ ...o, values: (o.values || []).filter(v => String(v.label || '').trim())
+        .map(v => (o.type === 'color' && !v.swatch) ? { ...v, swatch:DEF_SWATCH } : v) }))
+      .filter(o => String(o.name || '').trim() && o.values.length);
+    let optPend = {};
+    if(cleanOpts.length){
+      let n = 1;
+      cleanOpts.forEach(o => {
+        delete o._named;
+        o.values.forEach(v => {
+          if(v.image && extraData[v.image]){
+            const np = IMG_DIR + pid + '-o' + (n++) + '.jpg';
+            optPend[np] = extraData[v.image];
+            v.image = np;
+          }
+        });
+      });
+      rec.options = cleanOpts;
+    }
+
     /* الصور الإضافية — نعيد ترقيم المسارات المعلّقة على رقم المادة النهائي */
     if(extra.length){
       const keep = new Set(extra.filter(u => !extraData[u]));   // مسارات منشورة تبقى كما هي
@@ -589,6 +763,7 @@ function productSheet(id){
       rec.images = paths;
       if(Object.keys(pend).length) rec.imgsData = pend;
     }
+    if(Object.keys(optPend).length) rec.imgsData = Object.assign(rec.imgsData || {}, optPend);
 
     if(isNew) D.PRODUCTS.push(rec);
     else D.PRODUCTS[D.PRODUCTS.findIndex(x => x.id === p.id)] = rec;
@@ -1714,7 +1889,9 @@ function orderSheet(id){
         ${o.customer?.note ? `<div class="sum"><span>ملاحظات الزبون</span><b style="text-align:end;max-width:60%">${esc(o.customer.note)}</b></div>` : ''}
       </div></div>
       <div class="panel" style="box-shadow:none"><div class="panel-b">
-        ${(o.items || []).map(it => `<div class="sum"><span>${esc(it.name)} <small style="color:var(--grey-2)">× ${it.q}</small></span><b>${money(it.total)}</b></div>`).join('')}
+        ${(o.items || []).map(it => `<div class="sum"><span>${esc(it.name)} <small style="color:var(--grey-2)">× ${it.q}</small>${
+          it.opts ? `<br><small style="color:var(--brand-700);font-weight:700">${esc(it.opts)}</small>` : ''
+        }</span><b>${money(it.total)}</b></div>`).join('')}
         <div class="sum"><span>المجموع الفرعي</span><b>${money(o.subtotal)}</b></div>
         <div class="sum"><span>التوصيل</span><b>${o.fee ? money(o.fee) : 'مجاني'}</b></div>
         <div class="sum total"><span>الإجمالي</span><b>${money(o.total)} ${SITE.currency}</b></div>
