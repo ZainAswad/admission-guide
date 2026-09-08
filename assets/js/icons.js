@@ -105,16 +105,36 @@ function art(name) {
   return `<svg class="art" viewBox="0 0 120 120" aria-hidden="true">${d}</svg>`;
 }
 
-/* تعقيم SVG المرفوع — يُنشر على نطاق المتجر نفسه، فنزيل كل ما قد يُنفَّذ */
+/* تعقيم SVG المرفوع — يُنشر على نطاق المتجر نفسه، فنزيل كل ما قد يُنفَّذ.
+   نحلّله شجرةً لا بتعابير نمطية: التعابير تُخدَع بمحارف التحكّم مثل
+   java<TAB>script: التي يتجاهلها المتصفح عند قراءة الرابط فينفّذها. */
+const SVG_BAD_TAGS = /^(script|foreignobject|iframe|embed|object|use|image|animate|animatetransform|set|handler|listener)$/;
 function sanitizeSvg(text){
-  return String(text)
-    .replace(/<\s*script[\s\S]*?<\s*\/\s*script\s*>/gi, '')
-    .replace(/<\s*script[^>]*\/?>/gi, '')
-    .replace(/<\s*foreignObject[\s\S]*?<\s*\/\s*foreignObject\s*>/gi, '')
-    .replace(/<\s*foreignObject[^>]*\/?>/gi, '')
-    .replace(/\son[a-z]+\s*=\s*"[^"]*"/gi, '')
-    .replace(/\son[a-z]+\s*=\s*'[^']*'/gi, '')
-    .replace(/\son[a-z]+\s*=\s*[^\s>]+/gi, '')
-    .replace(/(href|xlink:href)\s*=\s*(["'])\s*javascript:[^"']*\2/gi, '')
-    .replace(/<\s*(!DOCTYPE|!ENTITY)[^>]*>/gi, '');
+  let doc;
+  try{ doc = new DOMParser().parseFromString(String(text), 'image/svg+xml'); }catch(e){ return ''; }
+  const root = doc && doc.documentElement;
+  if(!root || doc.querySelector('parsererror') || root.nodeName.toLowerCase() !== 'svg') return '';
+
+  const cleanAttrs = el => {
+    [...el.attributes].forEach(a => {
+      const n = a.name.toLowerCase();
+      if(n.startsWith('on')){ el.removeAttribute(a.name); return; }
+      if(n === 'href' || n === 'xlink:href' || n === 'src' || n === 'from' || n === 'to'){
+        /* نُسقط محارف التحكّم قبل الفحص، ونسمح بالمسموح فقط بدل حظر الممنوع */
+        const v = a.value.replace(/[\u0000-\u0020]/g, '').toLowerCase();
+        if(!/^(#|\/|\.{0,2}\/|data:image\/(png|jpe?g|gif|webp);base64,)/.test(v)) el.removeAttribute(a.name);
+        return;
+      }
+      if(n === 'style' && /(javascript|expression|behaviou?r)\s*[:(]/i.test(a.value)) el.removeAttribute(a.name);
+    });
+  };
+  const walk = el => {
+    [...el.children].forEach(ch => {
+      if(SVG_BAD_TAGS.test(ch.nodeName.toLowerCase())){ ch.remove(); return; }
+      walk(ch);
+    });
+    cleanAttrs(el);
+  };
+  walk(root);
+  return new XMLSerializer().serializeToString(root);
 }
