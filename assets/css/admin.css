@@ -262,3 +262,10 @@ details summary::-webkit-details-marker{display:none}
 .ordtotal{font-size:17px;font-weight:900;color:var(--brand-800)}
 .ordtotal small{font-size:11.5px;color:var(--grey)}
 @media (max-width:680px){ .ordgrid{grid-template-columns:1fr} }
+
+/* رسمة مرفوعة تُعرض داخل img بدل SVG مدمج */
+img.art{object-fit:contain}
+.iconup{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:9px}
+.iconup small{color:var(--grey);font-size:12px;flex:1;min-width:180px}
+.iconpick button[data-ickeep]{border-color:var(--brand);background:var(--brand-50)}
+.iconpick button[data-ickeep] i{color:var(--brand-700);font-weight:800}

@@ -89,7 +89,32 @@ function icon(name, cls) {
       : 'fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"') +
     `>${d}</svg>`;
 }
+/* رسمات مرفوعة بانتظار النشر: مسار ← بيانات مؤقتة.
+   تملؤه لوحة التحكم أثناء التحرير، وصفحة المتجر في وضع المعاينة. */
+const ART_SRC = {};
+/* هل القيمة مسار رسمة مرفوعة بدل مفتاح رسمة مدمجة؟ */
+function isArtPath(v){ return /^(data:|https?:)/.test(v) || v.includes('/'); }
+
 function art(name) {
-  const d = ART[name] || ART.box || ART.junction;
+  const n = String(name || '');
+  if(isArtPath(n)){
+    const src = ART_SRC[n] || (typeof assetUrl === 'function' ? assetUrl(n) : n);
+    return `<img class="art" src="${src}" alt="" loading="lazy" decoding="async">`;
+  }
+  const d = ART[n] || ART.box || ART.junction;
   return `<svg class="art" viewBox="0 0 120 120" aria-hidden="true">${d}</svg>`;
+}
+
+/* تعقيم SVG المرفوع — يُنشر على نطاق المتجر نفسه، فنزيل كل ما قد يُنفَّذ */
+function sanitizeSvg(text){
+  return String(text)
+    .replace(/<\s*script[\s\S]*?<\s*\/\s*script\s*>/gi, '')
+    .replace(/<\s*script[^>]*\/?>/gi, '')
+    .replace(/<\s*foreignObject[\s\S]*?<\s*\/\s*foreignObject\s*>/gi, '')
+    .replace(/<\s*foreignObject[^>]*\/?>/gi, '')
+    .replace(/\son[a-z]+\s*=\s*"[^"]*"/gi, '')
+    .replace(/\son[a-z]+\s*=\s*'[^']*'/gi, '')
+    .replace(/\son[a-z]+\s*=\s*[^\s>]+/gi, '')
+    .replace(/(href|xlink:href)\s*=\s*(["'])\s*javascript:[^"']*\2/gi, '')
+    .replace(/<\s*(!DOCTYPE|!ENTITY)[^>]*>/gi, '');
 }

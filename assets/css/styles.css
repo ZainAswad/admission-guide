@@ -703,3 +703,6 @@ html[dir=rtl] .footer a:not(.soc):not(.btn):hover{transform:translateX(-4px)}
 .track li.done b,.track li.now b{color:var(--brand-800)}
 .track li.now .dot{box-shadow:0 0 0 5px var(--brand-glow)}
 @media (max-width:600px){ .track li{font-size:10px} .track li .dot{width:23px;height:23px} }
+
+/* رسمة مرفوعة تُعرض داخل img بدل SVG مدمج */
+img.art{object-fit:contain}

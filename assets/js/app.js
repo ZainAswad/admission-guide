@@ -7,7 +7,7 @@ const esc  = s => String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','
 
 /* ---------- صورة المنتج ----------
    ASSET_REV: يتغيّر عند الحاجة لتجاوز نسخ محفوظة قديمة في متصفحات الزوار.  */
-const ASSET_REV = '5';
+const ASSET_REV = '6';
 function assetUrl(u){
   if(!u || /^(https?:|data:|blob:)/.test(u) || u.includes('?')) return u;
   return u + '?v=' + ASSET_REV;
@@ -1173,7 +1173,7 @@ async function copy(text){
 /* ================= الإقلاع ================= */
 function boot(){
   store.load();
-  if(typeof PREVIEW !== 'undefined' && PREVIEW) showPreviewBar();
+  if(typeof PREVIEW !== 'undefined' && PREVIEW){ collectPendingArt(); showPreviewBar(); }
   buildDrawer();
   buildFooter();
   bindGlobal();
@@ -1184,6 +1184,12 @@ function boot(){
   document.getElementById('boot')?.remove();
 }
 
+/* في المعاينة: الرسمات والصور المرفوعة لم تُنشر بعد، فنحلّها من المسودّة */
+function collectPendingArt(){
+  const take = o => Object.assign(ART_SRC, o.imgsData || {});
+  (PRODUCTS || []).forEach(take);
+  (CATEGORIES || []).forEach(c => { take(c); (c.subs || []).forEach(take); });
+}
 function showPreviewBar(){
   const el = document.createElement('div');
   el.id = 'previewBar';
