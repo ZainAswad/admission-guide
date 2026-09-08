@@ -1048,7 +1048,16 @@ function bindGlobal(){
     }
     /* السلة */
     const inc = t.closest('[data-inc]'); if(inc){ store.setQty(inc.dataset.inc, store.qtyOf(inc.dataset.inc) + 1); render(); return; }
-    const dec = t.closest('[data-dec]'); if(dec){ store.setQty(dec.dataset.dec, store.qtyOf(dec.dataset.dec) - 1); render(); return; }
+    const dec = t.closest('[data-dec]');
+    if(dec){
+      const k = dec.dataset.dec;
+      /* عند الكمية 1 يحذف السطر بدل أن يعلق — أوضح مع تعدّد أسطر الخيارات */
+      if(store.qtyOf(k) <= 1){
+        const row = dec.closest('.crow'); if(row) row.classList.add('out');
+        setTimeout(() => { store.remove(k); render(); }, 240);
+      } else { store.setQty(k, store.qtyOf(k) - 1); render(); }
+      return;
+    }
     const del = t.closest('[data-del]');
     if(del){
       const row = del.closest('.crow'); row.classList.add('out');

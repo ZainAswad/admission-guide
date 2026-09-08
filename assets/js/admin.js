@@ -413,7 +413,9 @@ function productSheet(id){
   /* الصور الإضافية: مسارات بالترتيب + خريطة البيانات المعلّقة للرفع */
   let extra = (p.images || []).slice();
   let extraData = Object.assign({}, p.imgsData || {});
-  let options = clone(p.options || []);
+  /* الخيارات المحفوظة سلفاً معرّفاتها نهائية: إعادة التسمية لا تولّد معرّفاً
+     جديداً، وإلا انكسرت سلال الزبائن المحفوظة على أجهزتهم */
+  let options = clone(p.options || []).map(o => (o.id ? { ...o, _named:true } : o));
 
   openSheet(isNew ? 'إضافة مادة جديدة' : 'تعديل المادة', `
     <div class="form">
