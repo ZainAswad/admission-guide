@@ -21,6 +21,29 @@ let PREVIEW = false;
    الخيارات حرّة يعرّفها صاحب المحل: لون، قياس، واطية، قدرة، أو أي اسم آخر.
    type ليس نوعاً بل طريقة عرض فقط: color مربّعات لونية، وما عداه أزرار نصية. */
 
+/* ================= التسعير =================
+   السعر إمّا مبلغ ثابت price، أو usd يُحوَّل بمدى سعر صرف فيظهر كمدى.
+   ولا شيء منهما = «السعر عند الطلب». */
+function usdRange(){
+  const r = (SITE.orders && SITE.orders.usdRate) || {};
+  const lo = +r.min || 0, hi = +r.max || lo;
+  return (lo > 0) ? { min: lo, max: Math.max(lo, hi) } : null;
+}
+/* يعيد { min, max, ranged, none } — min=max للسعر الثابت */
+function priceRange(p, opts){
+  const v = variantPrice(p, opts);                 // يراعي أسعار الخيارات
+  if(v > 0) return { min:v, max:v, ranged:false, none:false };
+  const usd = +(variantUsd(p, opts) || 0);
+  const r = usdRange();
+  if(usd > 0 && r){
+    const lo = Math.round(usd * r.min), hi = Math.round(usd * r.max);
+    return { min:lo, max:hi, ranged: hi > lo, none:false };
+  }
+  return { min:0, max:0, ranged:false, none:true };
+}
+/* السعر المعتمد في السلة والطلب: أعلى المدى حتى لا يقلّ عن الواقع */
+function effPrice(p, opts){ const r = priceRange(p, opts); return r.max; }
+
 /* أول قيمة من كل خيار — تُختار تلقائياً فلا يُمنع الزبون من الشراء */
 function defaultOpts(p){
   const o = {};
@@ -39,6 +62,24 @@ function variantPrice(p, opts){
     if(v && typeof v.price === 'number' && v.price > 0) price = v.price;
   });
   return price;
+}
+/* سعر بالدولار على مستوى القيمة — آخر قيمة مختارة تحمله تفوز */
+function variantUsd(p, opts){
+  let usd = +p.usd || 0;
+  (p.options || []).forEach(o => {
+    const v = optValue(p, o.id, (opts || {})[o.id]);
+    if(v && +v.usd > 0) usd = +v.usd;
+  });
+  return usd;
+}
+/* مواصفات القيم المختارة تُضاف إلى مواصفات المادة */
+function variantSpecs(p, opts){
+  const out = [];
+  (p.options || []).forEach(o => {
+    const v = optValue(p, o.id, (opts || {})[o.id]);
+    if(v && (v.specs || []).length) v.specs.forEach(x => { if(x && !out.includes(x)) out.push(x); });
+  });
+  return out;
 }
 /* صورة الخيار المختار إن وُجدت — آخر واحدة تفوز */
 function variantImage(p, opts){
@@ -114,7 +155,7 @@ const store = {
     return this.cart.map(l => {
       const p = byId(l.id); if(!p) return null;
       const opts  = l.opts || {};
-      const price = variantPrice(p, opts);
+      const price = effPrice(p, opts);
       const vimg  = variantImage(p, opts);
       const line  = { ...p, q:l.q, opts, key:lineKey(l.id, opts),
                       price, optsText: optsText(p, opts), total: price * l.q };

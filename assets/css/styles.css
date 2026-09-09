@@ -706,3 +706,8 @@ html[dir=rtl] .footer a:not(.soc):not(.btn):hover{transform:translateX(-4px)}
 
 /* رسمة مرفوعة تُعرض داخل img بدل SVG مدمج */
 img.art{object-fit:contain}
+
+/* سعر بمدى (تسعير بالدولار) و«السعر عند الطلب» */
+.price .rng{font-size:.88em;white-space:nowrap}
+.price .ask{font-size:.72em;font-weight:800;color:var(--grey);white-space:nowrap}
+.card .price .rng{font-size:.82em}

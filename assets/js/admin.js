@@ -36,7 +36,6 @@ function imgFallback(el){
 const DKEY = 'wz_draft_v1', TKEY = 'wz_gh_token', PKEY = 'wz_published_v1';
 const IMG_DIR = 'assets/img/products/';
 const MAX_EXTRA = 6;
-const DEF_SWATCH = '#cccccc';
 const ICON_DIR = 'assets/img/icons/';
 const MAX_ICON_KB = 120;            // أقصى عدد صور إضافية للمادة الواحدة
 const BRAND_DIR = 'assets/img/brands/';
@@ -241,7 +240,9 @@ function serializeData(d){
   L.push(`    deliveryFeeInCity: ${+S.orders.deliveryFeeInCity || 0},`);
   L.push(`    deliveryFeeOutCity: ${+S.orders.deliveryFeeOutCity || 0},`);
   L.push(`    freeDeliveryOver: ${+S.orders.freeDeliveryOver || 0},`);
-  L.push(`    webhook: ${q(S.orders.webhook || '')}`);
+  L.push(`    webhook: ${q(S.orders.webhook || '')},`);
+  const UR = S.orders.usdRate || {};
+  L.push(`    usdRate: { min: ${+UR.min || 0}, max: ${+UR.max || 0} }`);
   L.push('  },');
   L.push('  governorates: [');
   L.push('    ' + S.governorates.map(q).join(', '));
@@ -265,8 +266,9 @@ function serializeData(d){
   L.push('let PRODUCTS = [');
   L.push(d.PRODUCTS.map(p => {
     const head = ['id','name','brand'].map(k => `${k}: ${q(p[k])}`).join(', ');
-    const nums = [`price: ${+p.price}`];
+    const nums = [`price: ${+p.price || 0}`];
     if(p.old) nums.push(`old: ${+p.old}`);
+    if(p.usd) nums.push(`usd: ${+p.usd}`);
     const tail = [`icon: ${q(p.icon)}`];
     if(p.badge) tail.push(`badge: ${q(p.badge)}`);
     if(p.unit && p.unit !== 'حبة') tail.push(`unit: ${q(p.unit)}`);
@@ -282,6 +284,8 @@ function serializeData(d){
           if(v.swatch) f.push(`swatch: ${q(v.swatch)}`);
           if(v.image)  f.push(`image: ${q(v.image)}`);
           if(v.price)  f.push(`price: ${+v.price}`);
+          if(v.usd)    f.push(`usd: ${+v.usd}`);
+          if((v.specs || []).length) f.push(`specs: ${inlineArr(v.specs)}`);
           return `        { ${f.join(', ')} }`;
         }).join(',\n');
         return `      { id: ${q(o.id)}, name: ${q(o.name)}, type: ${q(o.type || 'text')},\n        values: [\n${vs}\n      ] }`;
@@ -429,9 +433,15 @@ function productSheet(id){
         <div class="field"><input id="fu" placeholder=" " value="${esc(p.unit || 'حبة')}"><label>وحدة البيع (حبة / لفة / متر …)</label></div>
       </div>
       <div class="f2">
-        <div class="field"><input id="fp" placeholder=" " inputmode="numeric" value="${p.price || ''}"><label>السعر بالدينار *</label><span class="msg">أدخل سعراً صحيحاً</span></div>
-        <div class="field"><input id="fo" placeholder=" " inputmode="numeric" value="${p.old || ''}"><label>السعر قبل التخفيض (اختياري)</label></div>
+        <div class="field"><input id="fp" placeholder=" " inputmode="numeric" value="${p.price || ''}"><label>السعر بالدينار</label></div>
+        <div class="field"><input id="fo" placeholder=" " inputmode="numeric" value="${p.old || ''}"><label>السعر قبل التخفيض</label></div>
       </div>
+      <div class="f2">
+        <div class="field"><input id="fusd" placeholder=" " inputmode="decimal" value="${p.usd || ''}"><label>السعر بالدولار — يُعرض كمدى</label></div>
+        <div class="field"><input placeholder=" " value="${usdHint(p.usd)}" disabled><label>المعروض للزبون</label></div>
+      </div>
+      <div class="note note-info">${icon('bolt')}<span>اترك الحقول الثلاثة فارغة ليظهر <b>«السعر عند الطلب»</b> ويتحوّل زر الشراء إلى استفسار.
+        السعر بالدينار يسبق الدولار إن وُجدا. ومدى سعر الصرف يُضبط من <b>إعدادات المحل</b> ويسري على كل المواد دفعةً واحدة.</span></div>
       <div class="f2">
         <div class="field"><select id="fg">
           <option value="">بدون شارة</option>
@@ -602,16 +612,21 @@ function productSheet(id){
           ${(o.values || []).map((v, j) => `
             <div class="optval">
               ${o.type === 'color'
-                ? `<input type="color" value="${esc(v.swatch || '#cccccc')}" data-osw="${i}.${j}" title="اللون">`
+                ? `<input type="color" value="${esc(swatchOf(v))}" data-osw="${i}.${j}" title="اللون">`
                 : ''}
               <input value="${esc(v.label || '')}" data-olab="${i}.${j}" placeholder="القيمة — مثل: أبيض">
-              <input value="${v.price ? v.price : ''}" data-opr="${i}.${j}" inputmode="numeric" placeholder="سعر خاص (اختياري)">
+              <input value="${v.price ? v.price : ''}" data-opr="${i}.${j}" inputmode="numeric" placeholder="سعر خاص">
+              <input value="${v.usd ? v.usd : ''}" data-ousd="${i}.${j}" inputmode="decimal" placeholder="بالدولار">
               <label class="ovimg${v.image ? ' has' : ''}" title="${v.image ? 'تغيير الصورة' : 'إضافة صورة'}">
                 ${v.image ? `<img src="${esc(extraData[v.image] || assetUrl(v.image))}" alt="" data-fb="" onerror="imgFallback(this)">` : icon('box')}
                 <input type="file" accept="image/*" data-oimg="${i}.${j}" hidden>
               </label>
               ${v.image ? `<button type="button" data-oimgdel="${i}.${j}" title="إزالة الصورة">${icon('close')}</button>` : ''}
               <button type="button" data-ovdel="${i}.${j}" title="حذف القيمة">${icon('trash')}</button>
+            </div>
+            <div class="optspecs">
+              <input value="${esc((v.specs || []).join(' | '))}" data-ospec="${i}.${j}"
+                placeholder="مواصفات خاصة بهذه القيمة — افصل بينها بـ |  مثال: 15 مصباح | قطر 80 سم">
             </div>`).join('')}
         </div>
         <button class="btn btn-sm btn-ghost" type="button" data-ovadd="${i}">${icon('plus')}<span>إضافة قيمة</span></button>
@@ -638,8 +653,32 @@ function productSheet(id){
       }
       return;
     }
-    if(t.dataset.olab !== undefined){ at(t.dataset.olab).v.label = t.value; return; }
-    if(t.dataset.osw  !== undefined){ at(t.dataset.osw).v.swatch = t.value; return; }
+    if(t.dataset.olab !== undefined){
+      const { o, v, i, j } = at(t.dataset.olab);
+      v.label = t.value;
+      /* لون مقترح من الاسم ما لم يختره المستخدم يدوياً */
+      if(o.type === 'color' && !v._pickedColor){
+        const g = guessSwatch(t.value);
+        if(g){
+          v.swatch = g;
+          const inp = $(`[data-osw="${i}.${j}"]`); if(inp) inp.value = g;
+        }
+      }
+      return;
+    }
+    if(t.dataset.ospec !== undefined){
+      const { v } = at(t.dataset.ospec);
+      const list = String(t.value).split('|').map(x => x.trim()).filter(Boolean);
+      if(list.length) v.specs = list; else delete v.specs;
+      return;
+    }
+    if(t.dataset.ousd !== undefined){
+      const n = parseFloat(String(t.value).replace(/[^\d.]/g, '')) || 0;
+      const { v } = at(t.dataset.ousd);
+      if(n > 0) v.usd = n; else delete v.usd;
+      return;
+    }
+    if(t.dataset.osw  !== undefined){ const { v } = at(t.dataset.osw); v.swatch = t.value; v._pickedColor = true; return; }
     if(t.dataset.opr  !== undefined){
       const n = parseInt(String(t.value).replace(/\D/g, ''), 10) || 0;
       const { v } = at(t.dataset.opr);
@@ -652,7 +691,7 @@ function productSheet(id){
       const o = options[+t.dataset.otype];
       o.type = t.value;
       /* لون افتراضي لكل قيمة، وإلا ظهرت كل الألوان متطابقة عند الزبون */
-      if(o.type === 'color') (o.values || []).forEach(v => { if(!v.swatch) v.swatch = DEF_SWATCH; });
+      if(o.type === 'color') (o.values || []).forEach(v => { v.swatch = swatchOf(v); });
       drawOpts(); return;
     }
     if(t.dataset.oimg !== undefined){
@@ -714,14 +753,16 @@ function productSheet(id){
     cats = $$('#catpick input:checked').map(x => x.value);
     let ok = true;
     const mark = (sel, bad) => { $(sel).closest('.field').classList.toggle('err', bad); if(bad) ok = false; };
-    mark('#fn', name.length < 2); mark('#fb', brand.length < 1); mark('#fp', price <= 0);
+    mark('#fn', name.length < 2); mark('#fb', brand.length < 1);
     $('#catMsg').style.display = cats.length ? 'none' : 'block'; if(!cats.length) ok = false;
     if(!ok){ toast('أكمل الحقول المطلوبة', 'err'); return; }
 
     const pid = isNew ? (($('#fi').value.trim()) || nextId(cats)) : p.id;
     if(isNew && D.PRODUCTS.some(x => x.id === pid)){ toast('رقم المادة مستخدم مسبقاً', 'err'); return; }
 
+    const usd = parseFloat(String($('#fusd').value).replace(/[^\d.]/g, '')) || 0;
     const rec = { id:pid, name, brand, price, icon:iconSel, cats, desc:$('#fd').value.trim(), specs };
+    if(usd > 0) rec.usd = usd;
     if(iconData) rec.imgsData = { [iconSel]: iconData };
     if(old > price) rec.old = old;
     const badge = $('#fg').value; if(badge) rec.badge = badge;
@@ -732,7 +773,12 @@ function productSheet(id){
     /* الخيارات — نحذف الفارغة، ونعيد ترقيم صور القيم المعلّقة */
     const cleanOpts = options
       .map(o => ({ ...o, values: (o.values || []).filter(v => String(v.label || '').trim())
-        .map(v => (o.type === 'color' && !v.swatch) ? { ...v, swatch:DEF_SWATCH } : v) }))
+        .map(v => {
+          const c = { ...v }; delete c._pickedColor;
+          if(o.type === 'color') c.swatch = swatchOf(c);
+          if(o.type !== 'color') delete c.swatch;
+          return c;
+        }) }))
       .filter(o => String(o.name || '').trim() && o.values.length);
     let optPend = {};
     if(cleanOpts.length){
@@ -852,6 +898,15 @@ function slugFrom(name, taken){
   return s;
 }
 /* ============ منتقي الرسمة: مدمجة أو مرفوعة ============ */
+/* يعرض للمدير كيف سيبدو سعر الدولار للزبون */
+function usdHint(usd){
+  const n = +usd || 0;
+  const r = (D && D.SITE && D.SITE.orders && D.SITE.orders.usdRate) || {};
+  const lo = +r.min || 0, hi = +r.max || lo;
+  if(!n || !lo) return '';
+  const a = Math.round(n * lo), b = Math.round(n * Math.max(lo, hi));
+  return b > a ? `${money(a)} – ${money(b)} د.ع` : `${money(a)} د.ع`;
+}
 function iconSlug(fileName){
   const base = String(fileName).replace(/\.[^.]+$/, '');
   return slugFrom(base, []) + '-' + Date.now().toString(36).slice(-4);
@@ -1113,6 +1168,14 @@ function renderSettings(){
         <div class="field"><input id="oHook" placeholder=" " value="${esc(S.orders.webhook || '')}" dir="ltr"><label>رابط حفظ الطلبات الخارجي (اختياري)</label></div>
       </div>
 
+      <h3 style="font-size:16px;margin-top:10px">سعر صرف الدولار</h3>
+      <div class="note note-info">${icon('bolt')}<span>المواد المسعّرة بالدولار تُعرض كمدى بالدينار وفق هذين الرقمين.
+        غيّرهما هنا فيتغيّر سعر كل تلك المواد دفعةً واحدة. اتركهما فارغين لتعطيل التسعير بالدولار.</span></div>
+      <div class="f2">
+        <div class="field"><input id="uMin" placeholder=" " inputmode="numeric" value="${((S.orders.usdRate || {}).min) || ''}"><label>أدنى سعر صرف</label></div>
+        <div class="field"><input id="uMax" placeholder=" " inputmode="numeric" value="${((S.orders.usdRate || {}).max) || ''}"><label>أعلى سعر صرف</label></div>
+      </div>
+
       <h3 style="font-size:16px;margin-top:10px">نظام الطلبات (Firebase)</h3>
       <div class="note note-info">${icon('bolt')}<span>يجعل الطلبات تصل داخل اللوحة بدل واتساب، وتتحكم بقبولها ورفضها.
         اتبع دليل <code>FIREBASE.md</code> في المستودع للحصول على هذه القيم. إن تركتها فارغة يعمل المتجر بواتساب كما كان.</span></div>
@@ -1176,6 +1239,10 @@ function renderSettings(){
     S.orders.deliveryFeeOutCity = +String($('#oOut').value).replace(/\D/g, '') || 0;
     S.orders.freeDeliveryOver   = +String($('#oFree').value).replace(/\D/g, '') || 0;
     S.orders.webhook = $('#oHook').value.trim();
+    const uMin = +String($('#uMin').value).replace(/[^0-9]/g, '') || 0;
+    const uMax = +String($('#uMax').value).replace(/[^0-9]/g, '') || 0;
+    if(uMin > 0) S.orders.usdRate = { min:uMin, max:Math.max(uMin, uMax || uMin) };
+    else delete S.orders.usdRate;
     S.firebase = S.firebase || {};
     S.firebase.apiKey    = $('#fbKey').value.trim();
     S.firebase.projectId = $('#fbProj').value.trim();

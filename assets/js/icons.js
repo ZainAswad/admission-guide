@@ -89,6 +89,39 @@ function icon(name, cls) {
       : 'fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"') +
     `>${d}</svg>`;
 }
+/* ألوان شائعة بالعربية — يُخمَّن اللون من الاسم فلا تظهر كل المربّعات رمادية.
+   يبقى المنتقي متاحاً لتغيير أي لون يدوياً. */
+const AR_COLORS = {
+  'ابيض':'#FFFFFF','أبيض':'#FFFFFF','اوف وايت':'#F4F1EA','أوف وايت':'#F4F1EA',
+  'اسود':'#1A1A1A','أسود':'#1A1A1A','رمادي':'#9AA0A6','فضي':'#C8CDD2','سلفر':'#C8CDD2',
+  'ذهبي':'#D4AF37','كولد':'#D4AF37','نحاسي':'#B87333','برونزي':'#8C6239','خشبي':'#A9784F',
+  'بيج':'#D8C4A0','بيجي':'#D8C4A0','بني':'#7B4B2A','كحلي':'#2E3D6E','ازرق':'#1E5AA8','أزرق':'#1E5AA8',
+  'سماوي':'#69B7E8','تركوازي':'#0EBCBB','اخضر':'#2E7D46','أخضر':'#2E7D46','زيتي':'#6B7A3A',
+  'احمر':'#D32F2F','أحمر':'#D32F2F','خمري':'#7B1F2B','وردي':'#E8A0B4','زهري':'#E8A0B4',
+  'بنفسجي':'#6A3FA0','اصفر':'#F2C230','أصفر':'#F2C230','برتقالي':'#E8792B',
+  'شفاف':'#EDF2F4','كريمي':'#F7EFE3','شمعي':'#F7EFE3'
+};
+function guessSwatch(label){
+  const s = String(label || '').trim()
+    .replace(/[ً-ْـ]/g, '')          // تشكيل وتطويل
+    .replace(/[إأآا]/g, 'ا').toLowerCase();
+  if(!s) return '';
+  const norm = k => k.replace(/[إأآا]/g, 'ا').toLowerCase();
+  for(const k of Object.keys(AR_COLORS)) if(norm(k) === s) return AR_COLORS[k];
+  /* اسم مركّب مثل «أزرق غامق» — نأخذ أول كلمة معروفة */
+  for(const w of s.split(/\s+/)) for(const k of Object.keys(AR_COLORS)) if(norm(k) === w) return AR_COLORS[k];
+  return '';
+}
+
+/* اللون الافتراضي القديم — يُعامل كأنه غير مضبوط فيُخمَّن من الاسم،
+   وبذلك تُصلَح البيانات المنشورة سابقاً بلا إعادة إدخال */
+const DEF_SWATCH = '#cccccc';
+function swatchOf(v){
+  const s = String((v && v.swatch) || '').trim();
+  if(s && s.toLowerCase() !== DEF_SWATCH) return s;
+  return guessSwatch(v && v.label) || s || '#DDDDDD';
+}
+
 /* رسمات مرفوعة بانتظار النشر: مسار ← بيانات مؤقتة.
    تملؤه لوحة التحكم أثناء التحرير، وصفحة المتجر في وضع المعاينة. */
 const ART_SRC = {};

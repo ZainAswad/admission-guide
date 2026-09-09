@@ -7,7 +7,7 @@ const esc  = s => String(s).replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','
 
 /* ---------- صورة المنتج ----------
    ASSET_REV: يتغيّر عند الحاجة لتجاوز نسخ محفوظة قديمة في متصفحات الزوار.  */
-const ASSET_REV = '6';
+const ASSET_REV = '7';
 function assetUrl(u){
   if(!u || /^(https?:|data:|blob:)/.test(u) || u.includes('?')) return u;
   return u + '?v=' + ASSET_REV;
@@ -148,12 +148,17 @@ function optionsHTML(p){
           return color
             ? `<button type="button" class="swatch${on ? ' on' : ''}" data-oid="${esc(o.id)}"
                  data-oval="${esc(v.label)}" title="${esc(v.label)}" aria-label="${esc(v.label)}"
-                 aria-pressed="${on}"><i style="background:${esc(v.swatch || '#DDD')}"></i></button>`
+                 aria-pressed="${on}"><i style="background:${esc(swatchOf(v))}"></i></button>`
             : `<button type="button" class="opt-pill${on ? ' on' : ''}" data-oid="${esc(o.id)}"
                  data-oval="${esc(v.label)}" aria-pressed="${on}">${esc(v.label)}</button>`;
         }).join('')}
       </div></div>`;
   }).join('')}</div>`;
+}
+/* مواصفات المادة + مواصفات القيم المختارة */
+function specsHTML(p, opts){
+  const list = [...(p.specs || []), ...variantSpecs(p, opts)];
+  return list.map(x => `<li>${icon('check')}<span>${esc(x)}</span></li>`).join('');
 }
 /* قراءة الاختيار الحالي من الصفحة */
 function readOpts(){
@@ -180,7 +185,9 @@ function pickOpt(p, oid, label){
 
   const opts = readOpts();
   const pr = $('#pPrice');
-  if(pr) pr.innerHTML = priceHTML(variantPrice(p, opts));
+  if(pr) pr.innerHTML = priceView(p, opts);
+  const sp = $('#pSpecs');
+  if(sp) sp.innerHTML = specsHTML(p, opts);
 
   const v = optValue(p, oid, label);
   if(v && v.image){
@@ -192,13 +199,20 @@ function pickOpt(p, oid, label){
     }
   }
 }
+/* عرض السعر: مبلغ ثابت، أو مدى ناتج عن الدولار وسعر الصرف، أو «عند الطلب» */
+function priceView(p, opts){
+  const r = priceRange(p, opts);
+  if(r.none) return '<span class="ask">السعر عند الطلب</span>';
+  if(!r.ranged) return priceHTML(r.min);
+  return `<span class="rng">${money(r.min)} – ${money(r.max)} <small>${SITE.currency}</small></span>`;
+}
 /* نقاط ألوان مصغّرة على بطاقة المنتج */
 function swatchDots(p){
   const o = (p.options || []).find(x => x.type === 'color' && (x.values || []).length > 1);
   if(!o) return '';
   const vals = o.values, show = vals.slice(0, 5), more = vals.length - show.length;
   return `<span class="cdots" aria-label="${esc(o.name)}: ${vals.length}">
-    ${show.map(v => `<i style="background:${esc(v.swatch || '#DDD')}"></i>`).join('')}
+    ${show.map(v => `<i style="background:${esc(swatchOf(v))}"></i>`).join('')}
     ${more > 0 ? `<b>+${more}</b>` : ''}</span>`;
 }
 function subLabel(p){
@@ -218,7 +232,8 @@ function card(p){
       <div class="badges">${badge}${off ? `<span class="bdg bdg-sale">-${off}%</span>` : ''}</div>
       <button class="fav ${store.isFav(p.id) ? 'on' : ''}" data-fav="${p.id}" aria-label="أضف إلى المفضلة">${icon('heart')}</button>
       ${media(p)}
-      <div class="quick"><button class="btn btn-sm btn-block" data-add="${p.id}">${icon('cart')}<span>أضف إلى السلة</span></button></div>
+      ${priceRange(p, defaultOpts(p)).none ? '' :
+        `<div class="quick"><button class="btn btn-sm btn-block" data-add="${p.id}">${icon('cart')}<span>أضف إلى السلة</span></button></div>`}
     </div>
     <div class="card-body">
       <span class="card-brand">${esc(p.brand)}</span>
@@ -226,10 +241,12 @@ function card(p){
       <span class="card-cat">${esc(subLabel(p))}</span>
       ${swatchDots(p)}
       <div class="price-row">
-        <span class="price">${priceHTML(p.price)}</span>
-        ${p.old ? `<span class="old">${money(p.old)}</span>` : ''}
+        <span class="price">${priceView(p, defaultOpts(p))}</span>
+        ${p.old && p.price ? `<span class="old">${money(p.old)}</span>` : ''}
       </div>
-      <button class="btn btn-sm btn-tonal card-add" data-add="${p.id}">${icon('cart')}<span>أضف إلى السلة</span></button>
+      ${priceRange(p, defaultOpts(p)).none
+        ? `<a class="btn btn-sm btn-tonal card-add" href="#/p/${p.id}">${icon('phone')}<span>استفسر عن السعر</span></a>`
+        : `<button class="btn btn-sm btn-tonal card-add" data-add="${p.id}">${icon('cart')}<span>أضف إلى السلة</span></button>`}
     </div>
   </article>`;
 }
@@ -441,17 +458,19 @@ function viewProduct(id){
         <span class="card-brand">${esc(p.brand)} · ${esc(p.id)}</span>
         <h3>${esc(p.name)}</h3>
         <div class="price-row">
-          <span class="price" id="pPrice" style="font-size:26px">${priceHTML(variantPrice(p, defaultOpts(p)))}</span>
+          <span class="price" id="pPrice" style="font-size:26px">${priceView(p, defaultOpts(p))}</span>
           ${p.old ? `<span class="old">${money(p.old)}</span><span class="off">وفّر ${off}%</span>` : ''}
           <span class="card-cat">/ ${esc(p.unit || 'حبة')}</span>
         </div>
         <p class="desc">${esc(p.desc)}</p>
-        <ul class="specs">${(p.specs || []).map(x => `<li>${icon('check')}<span>${esc(x)}</span></li>`).join('')}</ul>
+        <ul class="specs" id="pSpecs">${specsHTML(p, defaultOpts(p))}</ul>
         ${optionsHTML(p)}
         <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:18px">
           <div class="qty" data-qtybox><button data-step="-1" aria-label="إنقاص">${icon('minus')}</button>
             <span id="pq">1</span><button data-step="1" aria-label="زيادة">${icon('plus')}</button></div>
-          <button class="btn btn-lg" data-add="${p.id}" data-useqty>${icon('cart')}<span>أضف إلى السلة</span></button>
+          ${priceRange(p, defaultOpts(p)).none
+            ? `<a class="btn btn-lg wa" target="_blank" rel="noopener" href="${waLink(`السلام عليكم، أستفسر عن سعر: ${p.name} (${p.id})`)}">${icon('whatsapp')}<span>استفسر عن السعر</span></a>`
+            : `<button class="btn btn-lg" data-add="${p.id}" data-useqty>${icon('cart')}<span>أضف إلى السلة</span></button>`}
           <button class="ibtn fav ${store.isFav(p.id) ? 'on' : ''}" data-fav="${p.id}" style="position:static;width:48px;height:48px;box-shadow:var(--e1)">${icon('heart')}</button>
         </div>
         <a class="btn btn-block wa" style="margin-top:12px" target="_blank" rel="noopener"
@@ -851,13 +870,15 @@ function openQuick(id){
     <div class="qv-body">
       <span class="card-brand">${esc(p.brand)} · ${esc(p.id)}</span>
       <h3>${esc(p.name)}</h3>
-      <div class="price-row"><span class="price" style="font-size:24px">${priceHTML(p.price)}</span>
-        ${p.old ? `<span class="old">${money(p.old)}</span><span class="off">-${off}%</span>` : ''}
+      <div class="price-row"><span class="price" style="font-size:24px">${priceView(p, defaultOpts(p))}</span>
+        ${p.old && p.price ? `<span class="old">${money(p.old)}</span><span class="off">-${off}%</span>` : ''}
         <span class="card-cat">/ ${esc(p.unit || 'حبة')}</span></div>
       <p class="desc">${esc(p.desc)}</p>
-      <ul class="specs">${(p.specs || []).map(x => `<li>${icon('check')}<span>${esc(x)}</span></li>`).join('')}</ul>
+      <ul class="specs">${specsHTML(p, defaultOpts(p))}</ul>
       <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:16px">
-        <button class="btn btn-lg" data-add="${p.id}">${icon('cart')}<span>أضف إلى السلة</span></button>
+        ${priceRange(p, defaultOpts(p)).none
+          ? `<a class="btn btn-lg wa" target="_blank" rel="noopener" href="${waLink(`السلام عليكم، أستفسر عن سعر: ${p.name} (${p.id})`)}">${icon('whatsapp')}<span>استفسر عن السعر</span></a>`
+          : `<button class="btn btn-lg" data-add="${p.id}">${icon('cart')}<span>أضف إلى السلة</span></button>`}
         <a class="btn btn-lg btn-outline" href="#/p/${p.id}" data-mclose>التفاصيل الكاملة</a>
       </div>
       <div class="qv-cats">${p.cats.map(k => { const x = subInfo(k); return x ? `<a href="#/c/${x.parent.id}/${x.id}" data-mclose>${esc(x.name)}</a>` : ''; }).join('')}</div>
