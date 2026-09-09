@@ -625,8 +625,12 @@ function productSheet(id){
               <button type="button" data-ovdel="${i}.${j}" title="حذف القيمة">${icon('trash')}</button>
             </div>
             <div class="optspecs">
-              <input value="${esc((v.specs || []).join(' | '))}" data-ospec="${i}.${j}"
-                placeholder="مواصفات خاصة بهذه القيمة — افصل بينها بـ |  مثال: 15 مصباح | قطر 80 سم">
+              <div class="osrow">
+                <input data-osin="${i}.${j}" placeholder="مواصفة تخصّ «${esc(v.label || 'هذه القيمة')}» — مثال: 15 مصباح">
+                <button class="btn btn-sm btn-tonal" type="button" data-osadd="${i}.${j}">${icon('plus')}<span>إضافة</span></button>
+              </div>
+              <div class="chiplist">${(v.specs || []).map((x, k) =>
+                `<span class="cl">${esc(x)}<button type="button" data-osdel="${i}.${j}.${k}">${icon('close')}</button></span>`).join('')}</div>
             </div>`).join('')}
         </div>
         <button class="btn btn-sm btn-ghost" type="button" data-ovadd="${i}">${icon('plus')}<span>إضافة قيمة</span></button>
@@ -656,6 +660,9 @@ function productSheet(id){
     if(t.dataset.olab !== undefined){
       const { o, v, i, j } = at(t.dataset.olab);
       v.label = t.value;
+      /* اسم القيمة يظهر في حقل مواصفاتها فوراً — بلا إعادة رسم تُفقد التركيز */
+      const si = $(`[data-osin="${i}.${j}"]`);
+      if(si) si.placeholder = `مواصفة تخصّ «${t.value.trim() || 'هذه القيمة'}» — مثال: 15 مصباح`;
       /* لون مقترح من الاسم ما لم يختره المستخدم يدوياً */
       if(o.type === 'color' && !v._pickedColor){
         const g = guessSwatch(t.value);
@@ -664,12 +671,6 @@ function productSheet(id){
           const inp = $(`[data-osw="${i}.${j}"]`); if(inp) inp.value = g;
         }
       }
-      return;
-    }
-    if(t.dataset.ospec !== undefined){
-      const { v } = at(t.dataset.ospec);
-      const list = String(t.value).split('|').map(x => x.trim()).filter(Boolean);
-      if(list.length) v.specs = list; else delete v.specs;
       return;
     }
     if(t.dataset.ousd !== undefined){
@@ -683,6 +684,14 @@ function productSheet(id){
       const n = parseInt(String(t.value).replace(/\D/g, ''), 10) || 0;
       const { v } = at(t.dataset.opr);
       if(n > 0) v.price = n; else delete v.price;
+    }
+  };
+  $('#optList').onkeydown = e => {
+    const inp = e.target.closest('[data-osin]');
+    if(inp && e.key === 'Enter'){
+      e.preventDefault();
+      const btn = $(`[data-osadd="${inp.dataset.osin}"]`);
+      if(btn) btn.click();
     }
   };
   $('#optList').onchange = async e => {
@@ -724,6 +733,30 @@ function productSheet(id){
       if(j < 0 || j >= options.length) return;
       [options[i], options[j]] = [options[j], options[i]];
       drawOpts(); return;
+    }
+    /* مواصفات القيمة: إضافة وحذف شريحة */
+    const sa = t.closest('[data-osadd]');
+    if(sa){
+      const key = sa.dataset.osadd;
+      const inp = $(`[data-osin="${key}"]`);
+      const val = inp ? inp.value.trim() : '';
+      if(val){
+        const { v } = at(key);
+        (v.specs ||= []).push(val);
+        drawOpts();
+        /* أعد التركيز إلى الحقل نفسه ليكتب التالية مباشرة */
+        const again = $(`[data-osin="${key}"]`); if(again) again.focus();
+      }
+      return;
+    }
+    const sd = t.closest('[data-osdel]');
+    if(sd){
+      const [i, j, k] = sd.dataset.osdel.split('.').map(Number);
+      const v = options[i].values[j];
+      v.specs.splice(k, 1);
+      if(!v.specs.length) delete v.specs;
+      drawOpts();
+      return;
     }
     const va = t.closest('[data-ovadd]');
     if(va){
