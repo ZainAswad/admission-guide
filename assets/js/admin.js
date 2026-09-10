@@ -438,7 +438,8 @@ function productSheet(id){
       </div>
       <div class="f2">
         <div class="field"><input id="fusd" placeholder=" " inputmode="decimal" value="${p.usd || ''}"><label>السعر بالدولار — يُعرض كمدى</label></div>
-        <div class="field"><input placeholder=" " value="${usdHint(p.usd)}" disabled><label>المعروض للزبون</label></div>
+        <div class="field"><input placeholder=" " value="${usdHint(p.usd)}" disabled
+          ${usdHint(p.usd).startsWith('\u26A0') ? 'class="warn"' : ''}><label>المعروض للزبون</label></div>
       </div>
       <div class="note note-info">${icon('bolt')}<span>اترك الحقول الثلاثة فارغة ليظهر <b>«السعر عند الطلب»</b> ويتحوّل زر الشراء إلى استفسار.
         السعر بالدينار يسبق الدولار إن وُجدا. ومدى سعر الصرف يُضبط من <b>إعدادات المحل</b> ويسري على كل المواد دفعةً واحدة.</span></div>
@@ -936,7 +937,9 @@ function usdHint(usd){
   const n = +usd || 0;
   const r = (D && D.SITE && D.SITE.orders && D.SITE.orders.usdRate) || {};
   const lo = +r.min || 0, hi = +r.max || lo;
-  if(!n || !lo) return '';
+  if(!n) return '';
+  /* سعر بالدولار بلا سعر صرف يظهر للزبون «عند الطلب» — قُل ذلك بدل الصمت */
+  if(!lo) return '⚠ اضبط سعر الصرف من إعدادات المحل';
   const a = Math.round(n * lo), b = Math.round(n * Math.max(lo, hi));
   return b > a ? `${money(a)} – ${money(b)} د.ع` : `${money(a)} د.ع`;
 }

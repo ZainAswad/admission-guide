@@ -101,6 +101,17 @@ const AR_COLORS = {
   'بنفسجي':'#6A3FA0','اصفر':'#F2C230','أصفر':'#F2C230','برتقالي':'#E8792B',
   'شفاف':'#EDF2F4','كريمي':'#F7EFE3','شمعي':'#F7EFE3'
 };
+/* درجات تُعدّل اللون الأساس بدل أن تُهمَل */
+const SHADES = { 'فاتح':0.38, 'ملكي':-0.18, 'غامق':-0.38, 'داكن':-0.38, 'غامك':-0.38 };
+/* amt موجب يمزج بالأبيض وسالب يخفض القيمة — كلاهما يبقي التدرّج مقروءاً */
+function shade(hex, amt){
+  const h = String(hex).replace('#', '');
+  const n = parseInt(h.length === 3 ? h.split('').map(c => c + c).join('') : h, 16);
+  if(!isFinite(n)) return hex;
+  const f = c => Math.max(0, Math.min(255, Math.round(amt > 0 ? c + (255 - c) * amt : c * (1 + amt))));
+  return '#' + [f(n >> 16 & 255), f(n >> 8 & 255), f(n & 255)]
+    .map(x => x.toString(16).padStart(2, '0')).join('').toUpperCase();
+}
 function guessSwatch(label){
   const s = String(label || '').trim()
     .replace(/[ً-ْـ]/g, '')          // تشكيل وتطويل
@@ -108,9 +119,14 @@ function guessSwatch(label){
   if(!s) return '';
   const norm = k => k.replace(/[إأآا]/g, 'ا').toLowerCase();
   for(const k of Object.keys(AR_COLORS)) if(norm(k) === s) return AR_COLORS[k];
-  /* اسم مركّب مثل «أزرق غامق» — نأخذ أول كلمة معروفة */
-  for(const w of s.split(/\s+/)) for(const k of Object.keys(AR_COLORS)) if(norm(k) === w) return AR_COLORS[k];
-  return '';
+  /* اسم مركّب: أول كلمة معروفة، ثم درجتها إن ذُكرت —
+     وإلا ظهر «أزرق فاتح» و«أزرق غامق» بلون واحد، وهي نفس مشكلة التطابق */
+  let base = '', amt = 0;
+  for(const w of s.split(/\s+/)){
+    if(!base) for(const k of Object.keys(AR_COLORS)) if(norm(k) === w){ base = AR_COLORS[k]; break; }
+    if(SHADES[w] !== undefined) amt = SHADES[w];
+  }
+  return base ? (amt ? shade(base, amt) : base) : '';
 }
 
 /* اللون الافتراضي القديم — يُعامل كأنه غير مضبوط فيُخمَّن من الاسم،

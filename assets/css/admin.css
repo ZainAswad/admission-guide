@@ -278,3 +278,4 @@ img.art{object-fit:contain}
 .optspecs .chiplist{margin-top:6px;gap:6px}
 .optspecs .chiplist .cl{background:#fff;font-size:12px;padding:4px 10px}
 .optval input[data-ousd]{flex:1;min-width:88px}
+.field input.warn{color:var(--danger);border-color:var(--danger);font-weight:700}
