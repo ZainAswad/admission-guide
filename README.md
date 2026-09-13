@@ -13,8 +13,8 @@
 
 | | |
 |---|---|
-| **المتجر** (للزبائن) | https://admission-guide-flame.vercel.app |
-| **لوحة التحكم** (للمالك) | https://admission-guide-flame.vercel.app/admin.html |
+| **المتجر** (للزبائن) | https://al-wazni-electrics.vercel.app |
+| **لوحة التحكم** (للمالك) | https://al-wazni-electrics.vercel.app/admin.html |
 
 > عند ربط نطاق خاص لاحقاً، حدّث الروابط المطلقة في وسوم `og:` و`canonical` داخل `index.html`
 > وحقل `siteUrl` في `assets/js/data.js` حتى تبقى معاينة المشاركة صحيحة.
