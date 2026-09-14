@@ -1,6 +1,6 @@
 /* =============================================================
    الوزني للكهربائيات والإنارة الحديثة
-   ملف البيانات — وُلّد من لوحة التحكم بتاريخ ١٤‏/٩‏/٢٠٢٦، ١١:٣٤:٠٤ ص
+   ملف البيانات — وُلّد من لوحة التحكم بتاريخ ١٤‏/٩‏/٢٠٢٦، ١١:٣٥:٢٢ ص
    يمكن تعديله يدوياً أيضاً، أو من admin.html
    ============================================================= */
 
@@ -158,7 +158,7 @@ let PRODUCTS = [
   { id: 'AK-02239', name: 'اولمبي AKKOSTAR', brand: 'AKKOSTAR', price: 3500, icon: 'bulb', unit: 'قطعة', image: 'assets/img/products/AK-02239.jpg',
     cats: ['electrical/satellite'], desc: '',
     specs: ['متعدد القنوات', 'واحد خط'] },
-  { id: 'EL-101', name: 'صحن 85 سم AKKOSTAR', brand: 'AKKOSTAR', price: 15000, icon: 'bulb', image: 'assets/img/products/EL-101.jpg',
+  { id: 'EL-101', name: 'صحن 85 سم AKKOSTAR', brand: 'AKKOSTAR', price: 17000, icon: 'bulb', image: 'assets/img/products/EL-101.jpg',
     cats: ['electrical/satellite'], desc: '',
     specs: ['85 cm', 'نوع ثقيل', 'مقاوم للصدأ'] },
   { id: 'EL-102', name: 'مروحية سقفية OTG', brand: 'OTG', price: 65000, icon: 'bulb', image: 'assets/img/products/EL-102.jpg',
