@@ -1,6 +1,6 @@
 /* =============================================================
    الوزني للكهربائيات والإنارة الحديثة
-   ملف البيانات — وُلّد من لوحة التحكم بتاريخ ١٤‏/٩‏/٢٠٢٦، ١٢:٠٤:٢٥ م
+   ملف البيانات — وُلّد من لوحة التحكم بتاريخ ١٤‏/٩‏/٢٠٢٦، ١٢:٠٦:١٢ م
    يمكن تعديله يدوياً أيضاً، أو من admin.html
    ============================================================= */
 
@@ -176,18 +176,5 @@ let PRODUCTS = [
     specs: [] },
   { id: 'EL-104', name: 'مروحة سقف ثانوي 60*60', brand: 'AKKOSTAR', price: 55000, icon: 'bulb', image: 'assets/img/products/EL-104.jpg',
     cats: ['electrical/fans'], desc: '',
-    specs: ['ملف نحاس', 'ريش المنيوم', 'تحم ريمونت', '3سرعات'] },
-  { id: 'TL-103', name: 'كتر', brand: 'AKKOSTAR', price: 0, icon: 'bulb', image: 'assets/img/products/TL-103.jpg',
-    cats: ['tools/installMats'], desc: '',
-    specs: [] },
-  { id: 'LT-101', name: 'ثريا كرستال', brand: 'بدون', price: 170000, icon: 'bulb', badge: 'new', image: 'assets/img/products/LT-101.jpg', images: ['assets/img/products/LT-101-2.jpg'],
-    cats: ['lighting/ceiling'], desc: '',
-    specs: [],
-    options: [
-      { id: 'a', name: 'القياس', type: 'text',
-        values: [
-        { label: '80 سم', image: 'assets/img/products/LT-101-o1.jpg', price: 170000 },
-        { label: '60 سم', image: 'assets/img/products/LT-101-o2.jpg', price: 140000 }
-      ] }
-    ] }
+    specs: ['ملف نحاس', 'ريش المنيوم', 'تحم ريمونت', '3سرعات'] }
 ];
