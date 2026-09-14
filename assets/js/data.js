@@ -1,6 +1,6 @@
 /* =============================================================
    الوزني للكهربائيات والإنارة الحديثة
-   ملف البيانات — وُلّد من لوحة التحكم بتاريخ ١٤‏/٩‏/٢٠٢٦، ١١:٣٥:٢٢ ص
+   ملف البيانات — وُلّد من لوحة التحكم بتاريخ ١٤‏/٩‏/٢٠٢٦، ١١:٤٢:٠٠ ص
    يمكن تعديله يدوياً أيضاً، أو من admin.html
    ============================================================= */
 
@@ -169,5 +169,11 @@ let PRODUCTS = [
     specs: ['2200W'] },
   { id: 'TL-101', name: 'بورد بلاستك السلطان 50*40', brand: 'السلطان', price: 25000, icon: 'bulb', image: 'assets/img/products/TL-101.jpg',
     cats: ['tools/installMats', 'boards/panels'], desc: '',
-    specs: [] }
+    specs: [] },
+  { id: 'TL-102', name: 'بوكس استراحة 12*12', brand: 'AKKOSTAR', price: 1500, icon: 'bulb', image: 'assets/img/products/TL-102.jpg',
+    cats: ['tools/installMats', 'boards/panels'], desc: '',
+    specs: [] },
+  { id: 'EL-104', name: 'مروحة سقف ثانوي 60*60', brand: 'AKKOSTAR', price: 55000, icon: 'bulb', image: 'assets/img/products/EL-104.jpg',
+    cats: ['electrical/fans'], desc: '',
+    specs: ['ملف نحاس', 'ريش المنيوم', 'تحم ريمونت', '3سرعات'] }
 ];
