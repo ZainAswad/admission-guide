@@ -1,6 +1,6 @@
 /* =============================================================
    الوزني للكهربائيات والإنارة الحديثة
-   ملف البيانات — وُلّد من لوحة التحكم بتاريخ ١٤‏/٩‏/٢٠٢٦، ١٢:٠١:١٠ م
+   ملف البيانات — وُلّد من لوحة التحكم بتاريخ ١٤‏/٩‏/٢٠٢٦، ١٢:٠٤:٢٥ م
    يمكن تعديله يدوياً أيضاً، أو من admin.html
    ============================================================= */
 
@@ -179,5 +179,15 @@ let PRODUCTS = [
     specs: ['ملف نحاس', 'ريش المنيوم', 'تحم ريمونت', '3سرعات'] },
   { id: 'TL-103', name: 'كتر', brand: 'AKKOSTAR', price: 0, icon: 'bulb', image: 'assets/img/products/TL-103.jpg',
     cats: ['tools/installMats'], desc: '',
-    specs: [] }
+    specs: [] },
+  { id: 'LT-101', name: 'ثريا كرستال', brand: 'بدون', price: 170000, icon: 'bulb', badge: 'new', image: 'assets/img/products/LT-101.jpg', images: ['assets/img/products/LT-101-2.jpg'],
+    cats: ['lighting/ceiling'], desc: '',
+    specs: [],
+    options: [
+      { id: 'a', name: 'القياس', type: 'text',
+        values: [
+        { label: '80 سم', image: 'assets/img/products/LT-101-o1.jpg', price: 170000 },
+        { label: '60 سم', image: 'assets/img/products/LT-101-o2.jpg', price: 140000 }
+      ] }
+    ] }
 ];
