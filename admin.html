@@ -7,10 +7,16 @@
 <meta name="robots" content="noindex, nofollow">
 <meta name="theme-color" content="#0EBCBB">
 <link rel="icon" href="assets/img/favicon.png?v=3" type="image/png">
+<link rel="apple-touch-icon" href="assets/img/pwa/admin-apple-180.png">
+<link rel="manifest" href="manifest-admin.json">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="لوحة الوزني">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap" media="print" onload="this.media='all'">
-<link rel="stylesheet" href="assets/css/styles.css?v=10">
+<link rel="stylesheet" href="assets/css/styles.css?v=12">
 <link rel="stylesheet" href="assets/css/admin.css?v=12">
 </head>
 <body>
@@ -144,5 +150,12 @@
 <script src="assets/js/icons.js?v=12"></script>
 <script src="assets/js/orders.js?v=10"></script>
 <script src="assets/js/admin.js?v=12"></script>
+<script>
+/* تسجيل عامل الخدمة — يمنح التثبيت على الشاشة الرئيسية والعمل بلا إنترنت.
+   الفشل هنا لا يعني شيئاً للزائر، فالموقع يعمل كاملاً بدونه. */
+if('serviceWorker' in navigator){
+  addEventListener('load', () => navigator.serviceWorker.register('/sw.js').catch(() => {}));
+}
+</script>
 </body>
 </html>
