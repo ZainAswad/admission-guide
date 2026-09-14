@@ -1,19 +1,17 @@
-# إعدادات Cloudflare Pages — تُقابل ما في vercel.json
-# (Vercel يتجاهل هذا الملف تماماً، فوجوده آمن على الاستضافتين)
-# القاعدة الأعمّ أولاً، ثم الأخصّ لتتقدّم عليها
+# إعدادات Cloudflare Pages — تُقابل headers في vercel.json قاعدةً بقاعدة.
+# (Vercel يتجاهل هذا الملف، فوجوده آمن على الاستضافتين)
+#
+# القواعد غير متداخلة عمداً: لا مسار تطابقه قاعدتان تضبطان Cache-Control،
+# فلا يتوقّف الناتج على أيّ قاعدة ترجّحها المنصّة عند التطابق.
+# إن أضفت قاعدة هنا فأضف مقابلها في vercel.json، والعكس.
 
 /*
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
   X-Frame-Options: SAMEORIGIN
 
-/assets/*
-  Cache-Control: public, max-age=3600, must-revalidate
-
-/assets/img/products/*
-  Cache-Control: public, max-age=60, must-revalidate
-
-/assets/img/brands/*
+# الصور تُنشر من اللوحة (products و icons) ويبدّلها صاحب المحل
+/assets/img/*
   Cache-Control: public, max-age=60, must-revalidate
 
 /assets/js/*
@@ -25,5 +23,17 @@
 /
   Cache-Control: public, max-age=0, must-revalidate
 
+/admin
+  Cache-Control: public, max-age=0, must-revalidate
+
 /*.html
+  Cache-Control: public, max-age=0, must-revalidate
+
+/sw.js
+  Cache-Control: public, max-age=0, must-revalidate
+
+/manifest.json
+  Cache-Control: public, max-age=0, must-revalidate
+
+/manifest-admin.json
   Cache-Control: public, max-age=0, must-revalidate
